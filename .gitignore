@@ -17,6 +17,7 @@
 *.swp
 
 ###Specific stuff
+*large*
 *example*
 *toy*
 *trial*
@@ -27,5 +28,5 @@
 *test*
 *temp*
 *mock*
-*output*
 *scratch*
+*old*
