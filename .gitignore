@@ -10,8 +10,6 @@
 *.csv
 
 ### swmf.gitignore
-*.dat
-*.in
 
 ### python.gitignore
 *__pycache__
