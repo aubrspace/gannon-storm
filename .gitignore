@@ -1,0 +1,34 @@
+### macOS.gitignore
+*.DS_Store
+
+### tecplot.gitignore
+#datafiles
+*.plt
+*.plt.gz
+*.png
+*.mp4
+*.csv
+
+### swmf.gitignore
+*.dat
+*.in
+
+### python.gitignore
+*__pycache__
+
+### vim.gitignore
+*.swp
+
+###Specific stuff
+*example*
+*toy*
+*trial*
+*copy*
+*demo*
+*note*
+*local*
+*test*
+*temp*
+*mock*
+*output*
+*scratch*
