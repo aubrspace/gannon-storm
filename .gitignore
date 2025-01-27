@@ -7,7 +7,6 @@
 *.plt.gz
 *.png
 *.mp4
-*.csv
 
 ### swmf.gitignore
 

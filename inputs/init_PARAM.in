@@ -1,0 +1,528 @@
+Name Root Last Stride nThread
+#COMPONENTMAP
+GM  0 -3 -1  -1         GM runs on 0:nProc-3 multithreaded
+IE -2 -1  1             IE runs on last 2 PE-s
+IM -2 -2  1             IM runs on nProc-2 PE
+
+#DESCRIPTION
+Preconditioning for text matrix runs
+
+#TIMEACCURATE
+F			DoTimeAccurate
+
+#STARTTIME            
+2024		year
+5			month
+10			day
+6			hour
+0 			minute
+0			second
+0			fracsecond
+
+#COMPONENT
+IM			NameComp
+F			UseComp
+
+#COUPLE2
+GM			NameComp1
+IE			NameComp2
+10                      DnCouple
+-1                      DtCouple
+
+#BEGIN_COMP GM ---------------------------------------------------------------
+
+#GRIDBLOCKALL
+12000                    MaxBlock
+
+#GRID
+1			nRootBlock_D(x_)
+1			nRootBlock_D(y_)
+1			nRootBlock_D(z_)
+-224.			xMin
+ 32.			xMax
+-128.			yMin
+ 128.			yMax
+-128.			zMin
+ 128.			zMax
+
+! Maximum resolution initially
+#GRIDRESOLUTION
+2.0			Resolution
+initial			NameArea
+
+! Minimum resolution in the computational domain
+#GRIDRESOLUTION
+8.0			Resolution
+all			NameArea
+
+#GRIDRESOLUTION
+1.0                     Resolution
+box                     NameArea
+-100.0                  xMinBox
+ -16.0                  yMinBox
+ -16.0                  zMinBox
+  22.0                  xMaxBox
+  16.0                  yMaxBox
+  16.0                  zMaxBox
+
+! Better res at geosync and near tail.
+#GRIDRESOLUTION
+1/4
+box
+-20.0                  xMinBox
+-8.0                   yMinBox
+-8.0                   zMinBox
+ 8.0                   xMaxBox
+ 8.0                   yMaxBox
+ 8.0                   zMaxBox
+
+
+! Close tail and bow shock resolution
+#GRIDRESOLUTION
+1/2			Resolution
+box
+-32.0
+-25.0
+-25.0
+ 20.0
+ 25.0
+ 25.0			zMaxBox
+
+! Approximate mp boundary with paraboloid
+#GRIDRESOLUTION
+1/2			    Resolution
+paraboloidx
+ 20.0            xPosition
+ 0.0             yPosition
+ 0.0             zPosition
+-52.0            Height
+ 35.0            Radius
+
+#GRIDRESOLUTION
+1/8			Resolution
+shell0			NameArea
+2.5			r1Shell
+8.0			r2Shell
+
+#BODY
+T                       UseBody
+2.5                     rBody     (in planet radius)
+3.0                     rCurrents (in planet radius)
+28.0                    BodyNDim  (/cc)
+25000.0                 BodyTDim  (K)
+
+#TIMESTEPPING
+1			    nStage
+0.80			CflExlp
+
+#OUTERBOUNDARY
+outflow			TypeBc1
+vary			TypeBc2
+float			TypeBc3
+float			TypeBc4
+float			TypeBc5
+float			TypeBc6
+
+#INNERBOUNDARY
+ionosphere		TypeBcInner
+
+! This is now the default, but may not be optimal
+MAGNETICINNERBOUNDARY
+-1			    B1rCoef
+
+! Set the inner boundary density as Rho0Cpcp + RhoPerCpcp*CPCP[keV]
+#CPCPBOUNDARY
+T                       UseCpcpBc  (rest is read if true)
+28.0                    Rho0Cpcp   [amu/cc]
+0.1                     RhoPerCpcp [amu/cc / keV]
+
+#INNERBCPE
+0.1
+
+#SOLARWINDFILE
+T                       UseSolarWindFile
+mothersday_IMF.dat	NameSolarWindFile
+
+#SCHEME
+1			      nOrder
+Sokolov			TypeFlux
+
+#NONCONSERVATIVE
+F                       UseNonConservative
+
+#CONSERVATIVECRITERIA
+1			nConservCrit
+parabola    TypeConservCrit
+5.0         xParabolaConserv
+15.0        yParabolaConserv
+
+#TRACE
+T           UseTrace
+T           UseAccurateTrace
+0.1         DtExchangeTrace [sec]
+1           DnTrace
+
+#TRACEIE
+T           DoTraceIE
+
+#TRACELIMIT
+600
+
+#SAVELOGNAME
+F                       IsLogName_n
+T                       IsLogName_e
+
+#SAVEPLOTNAME
+F                       IsPlotName_n
+F                       IsPlotName_t
+T                       IsPlotName_e
+
+#PLOTFILENAME
+date			TimeUnitMax
+
+#SAVELOGFILE
+T			 DoSaveLogfile
+VAR step date		StringLogfile
+-1			DnSaveLogfile
+5.0			DtSaveLogfile
+dt rho mx my mz p bx by bz pmin pmax dst_sm dstflx cpcpn cpcps
+3.0			StringRFlux
+
+#DOAMR
+T			DoAmr
+100			DnAmr
+-1			DtAmr
+T			IsStrictAmr
+
+#MAGPERTURBINTEGRAL
+T                       UseSurfaceIntegral
+T                       UseFastFacIntegral
+MAG			TypeCoordIndex
+MAG                     TypeCoordFacGrid
+
+#MAGNETOMETER
+Param/supermag.dat		NameMagInputFile
+single			        TypeFileOut
+-1			            DnOutput
+60.0			        DtOutput
+
+#GEOMAGINDICES
+180			nSizeKpWindow [min]
+60.0			DtOutput      [sec]
+
+#MAGNETOMETERGRID
+1			nMagGridFile
+global real4		TypeFileMagGrid
+GSM			    TypeCoordMagGrid
+361			    nLonMagGrid
+181			    nLatMagGrid
+0.			    LonMinMagGrid
+360.			LonMaxMagGrid
+-90.			LatMinMagGrid
+90.			LatMaxMagGrid
+-1			    DnSaveMagGrid
+20.0			DtSaveMagGrid
+
+! Satellite trajectories
+#INCLUDE
+SATELLITES.in
+
+#END_COMP GM -----------------------------------------------------------------
+
+#BEGIN_COMP IE ---------------------------------------------------------------
+
+#IONOSPHERE
+5			TypeConductanceModel
+F			UseFullCurrent
+F			UseFakeRegion2
+-1.0			F107Flux
+1.0			StarLightPedConductance
+0.25			PolarCapPedConductance
+
+#BOUNDARY
+10.0			LatBoundary
+
+#CONDUCTANCEFILES
+cmee_hal_coeffs.dat	NameHalFile
+cmee_ped_coeffs.dat	NamePedFile
+
+#AURORALOVAL
+T			UseOval (rest of parameters read if true)
+T			UseOvalShift
+F			UseSubOvalConductance
+T			UseAdvancedOval
+F			DoFitCircle (read if UseAdvancedOval is true)
+
+#USECMEE
+T			UseCMEEFitting
+45			LatNoConductanceSI
+7.5			FactorHallCMEE
+5			FactorPedCMEE
+
+#SAVEPLOT
+1			nPlotFile
+max idl     StringPlot
+100         DnSavePlot
+-1		    DtSavePlot
+
+#END_COMP IE -----------------------------------------------------------------
+
+#STOP
+700         MaxIter
+-1			TimeMax
+
+#RUN	######################################################################
+
+#BEGIN_COMP GM ---------------------------------------------------------------
+
+#DOAMR
+F			DoAmr
+
+#SCHEME
+2			nOrder
+Sokolov			TypeFlux
+mc3                     TypeLimiter
+1.2			BetaLimiter
+
+#TIMESTEPPING
+2			nStage
+0.60			CflExlp
+
+#SAVEPLOT
+2                       nPlotFiles
+y=0 MHD idl             StringPlot
+800                     DnSavePlot
+-1                      DtSavePlot
+-1                      DxSavePlot
+z=0 MHD idl             StringPlot
+800                     DnSavePlot
+-1                      DtSavePlot
+-1                      DxSavePlot
+
+#END_COMP GM -----------------------------------------------------------------
+
+#STOP
+1500        MaxIter
+-1			TimeMax
+
+#RUN	######################################################################
+
+#TIMEACCURATE
+T			IsTimeAccurate
+
+#PROGRESS
+1000			DnProgressShort
+10000			DnProgressLong
+
+#CHECKTIMESTEP
+T                       DoCheckTimeStep
+10                      DnCheckTimeStep (2 or more)
+0.01                    TimeStepMin [s] (negative value means SessionTime/10,000,000)
+
+#SAVERESTART
+T           DoSaveRestart
+-1			DnSaveRestart
+3 hour		DtSaveRestart
+
+MAKEDIR
+F            NameRestartOutDir
+
+#RESTARTOUTDIR
+SWMF_RESTART.YYYYMMDD_HHMMSS		NameRestartOutDir
+
+#CHECKSTOP
+T			DoCheckStop
+-1			DnCheckStop
+10 minute		DtCheckStop
+
+#COMPONENT
+IM			NameComp
+T			UseComp
+
+! Allow GM/IM and IE run in parallel. 
+#COUPLEORDER
+5			nCouple
+IE GM			NameSourceTarget
+IE IM			NameSourceTarget
+GM IE			NameSourceTarget
+GM IM			NameSourceTarget
+IM GM			NameSourceTarget
+
+#COUPLE2
+GM			NameComp1
+IE			NameComp2
+-1			DnCouple
+5.0			DtCouple
+
+#COUPLE2
+IM			NameComp1
+GM			NameComp2
+-1			DnCouple
+10.0			DtCouple
+
+#COUPLE1
+IE			NameComp1
+IM			NameComp2
+-1			DnCouple
+10.0			DtCouple
+
+#COUPLETIME
+GM			NameComp
+F			DoCoupleOnTime
+
+#UPDATEB0
+0.5			DtUpdateB0
+
+#BEGIN_COMP GM ---------------------------------------------------------------
+
+! Setting 1
+#IMCOUPLING
+20.0                    TauCoupleIm
+T                       DoImSatTrace
+T                       DoCoupleImPressure
+T                       DoCoupleImDensity
+0.01			DensityCoupleFloor
+F                       DoFixPolarRegion
+! end of setting 1
+
+! Setting 2
+IMCOUPLING
+20.0                    TauCoupleIm
+T                       DoImSatTrace
+T                       DoCoupleImPressure
+T                       DoCoupleImDensity
+0.01			DensityCoupleFloor
+T                       DoFixPolarRegion
+5.0                     rFixPolarRegion
+56.0                    PolarNDim [amu/cc]
+50000.0                 PolarTDim [K]
+
+IMCOUPLINGSMOOTH
+10.0                    dLatSmoothIm [deg]
+! end of setting 2
+
+! Pressures below pMinDim are replaced with pMinDim.
+#MINIMUMPRESSURE
+1e-5			pMinDim [nPa]
+
+#SAVEPLOT
+2                               nPlotFiles
+3d VAR tcp		                stringplot
+-1			                    dnsaveplot
+1 min			                dtsaveplot
+{MHD} status theta1 theta2 phi1 phi2 dvol       namevars
+{default}                       namepars
+3d VAR idl		                stringplot
+-1			                    dnsaveplot
+1 min			                dtsaveplot
+-1			                    dxsaveplot
+{MHD} status theta1 theta2 phi1 phi2 dvol       namevars
+{default}                       namepars
+
+#BORIS
+T			UseBorisCorrection
+0.02			BorisClightFactor
+
+#REGION
+borisregion		NameRegion
+sphere tapered	StringShape
+-4.0			xPosition
+0.0			    yPosition
+0.0			    zPosition
+14.0			Radius
+2.0			    Taper
+
+#BORISREGION
+borisregion		NameBorisRegion
+
+#TIMESTEPPING
+2			nStage
+0.85			CflExpl
+
+#END_COMP GM -----------------------------------------------------------------
+
+#BEGIN_COMP IM ---------------------------------------------------------------
+
+#TYPEBOUNDARY
+ellipse			TypeBoundary
+
+#SETBOUNDARYPARAMS
+2.0			DeltaRmax
+2.0			DeltaMLTmax
+
+#PRERUNFIELD
+T			DoWritePrerun
+F			UsePrerun
+60			DtRead
+
+#PRERUNSAT
+T			DoWritePrerun
+F			UsePrerunSat
+60			DtReadSat
+
+#DECAY
+T 			UseDecay
+36000. 			DecayTimescale in seconds
+
+#COMPOSITION
+FIXED			NameCompModel
+0.80			Fraction H+
+0.20			Fraction O+
+1.0			Fraction e-
+
+#SETENERGYGRID
+31			neng
+T			UseLogEGrid
+0.1			MinIonEnergy (keV)
+420			MaxIonEnergy (keV)
+
+#SAVEPLOT
+5			nCIMIFileType
+fls all			StringPlot
+60			DtOutput
+T			DoSaveSeparateFiles
+psd all			StringPlot
+60			DtOutput
+T			DoSaveSeparateFiles
+vp all			StringPlot
+60			DtOutput
+T			DoSaveSeparateFiles
+vl all			StringPlot
+60			DtOutput
+T			DoSaveSeparateFiles
+2d all			StringPlot
+60			DtOutput
+
+#SAVELOG
+10			DtSaveLog
+
+WAVEDIFFUSION
+F			UseWaveDiffusion
+T			UseHiss
+T			UseChorus
+D_hiss_UCLA.dat		HissWavesD
+D_LBchorus_merge3.dat	ChorusWavesD
+T			UseKpIndex
+
+#END_COMP IM -----------------------------------------------------------------
+
+#BEGIN_COMP IE ---------------------------------------------------------------
+
+#SAVEPLOT
+1			            nPlotFile
+max tec                 StringPlot
+-1                      DnSavePlot
+1 min			        DtSavePlot
+
+#END_COMP IE -----------------------------------------------------------------
+
+#ENDTIME            
+2024			year
+5			    month
+10 			    day
+6			    hour
+30 			    minute
+0			    second
+0			    fracsecond
+
+#END ############################################################
