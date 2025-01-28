@@ -7,6 +7,7 @@ from numpy import sin,cos,deg2rad,rad2deg,pi
 import datetime as dt
 import pandas as pd
 from matplotlib import pyplot as plt
+from cmcrameri import cm
 #
 from global_energetics.analysis.plot_tools import (pyplotsetup,
                                                    bin_and_describe,
@@ -206,22 +207,31 @@ def plot_saturation(mp_test,dataset,outPath):
     # Get data to a common time axis
     index_log = dataset['obs2']['swmf_log'].index
     index_sw = dataset['obs2']['swmf_sw'].index
-    t_log = [float(t.to_numpy()) for t in index_log-TINIT]
-    t_sw = [float(t.to_numpy()) for t in index_sw-TINIT]
-    t_energy = [float(t.to_numpy()) for t in mp_test.index-TINIT]
+    t_log = [float(t.to_numpy()) for t in index_log-TMIN]
+    t_sw = [float(t.to_numpy()) for t in index_sw-TMIN]
+    t_test = [float(t.to_numpy()) for t in mp_test.index-TMIN]
     # Extract the quantities for this subset of data
-    Ein  = np.interp(t_energy,t_sw,
+    inner_test = dataset['analysis']['inner_mp']
+    closed_test = dataset['analysis']['msdict']['closed']
+    lobes_test = dataset['analysis']['msdict']['lobes']
+    Ein  = np.interp(t_test,t_sw,
                      dataset['obs2']['swmf_sw']['EinWang'].values/1e12)
-    Ein2 = np.interp(t_energy,t_sw,
-                    -dataset['obs2']['swmf_sw']['Pstorm'].values/1e12)
-    CPCP = np.interp(t_energy,t_log,
+    Esw = np.interp(t_test,t_sw,
+                     dataset['obs2']['swmf_sw']['Esw'].values/1e3)
+    CPCP = np.interp(t_test,t_log,
                      dataset['obs2']['swmf_log']['cpcpn'].values)
     K1   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]'])/-1e12
+    K   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']+
+           mp_test['K_netK5 [W]']+mp_test['UtotM5 [W]']+
+           closed_test['K_netK7 [W]']+lobes_test['K_netK3 [W]'])/-1e12
     U    = (mp_test['Utot [J]'])/1e15
+    Upoints = np.linspace(20,85,100)
+    decay_points = Upoints*1e3/(60*60*10)
     # Initialize things for context data
     T0 = dt.datetime(2022,6,6,0,0)
     allK1 = np.array([])
-    allEin,allEin2 = np.array([]),np.array([])
+    allK = np.array([])
+    allEin,allEsw = np.array([]),np.array([])
     allCPCP = np.array([])
     allU    = np.array([])
     testpoints = ['stretched_LOWnLOWu',
@@ -241,6 +251,15 @@ def plot_saturation(mp_test,dataset,outPath):
         mp = dataset[run]['mpdict']['ms_full'][
                                dataset[run]['mpdict']['ms_full'].index>tstart]
         mp = mp.resample('60S').asfreq()
+        inner = dataset[run]['inner_mp'][
+                               dataset[run]['inner_mp'].index>tstart]
+        inner = inner.resample('60S').asfreq()
+        closed = dataset[run]['msdict']['closed'][
+                               dataset[run]['msdict']['closed'].index>tstart]
+        closed = closed.resample('60S').asfreq()
+        lobes = dataset[run]['msdict']['lobes'][
+                               dataset[run]['msdict']['lobes'].index>tstart]
+        lobes = lobes.resample('60S').asfreq()
         # Get data to a common time axis
         index_log = dataset[run]['obs']['swmf_log'].index
         index_sw = dataset[run]['obs']['swmf_sw'].index
@@ -251,53 +270,190 @@ def plot_saturation(mp_test,dataset,outPath):
         # Extract the quantities for this subset of data
         evEin   = np.interp(t_energy,t_sw,
                         dataset[run]['obs']['swmf_sw']['EinWang'].values/1e12)
-        evEin2  = np.interp(t_energy,t_sw,
-                        -dataset[run]['obs']['swmf_sw']['Pstorm'].values/1e12)
+        evEsw   = np.interp(t_energy,t_sw,
+                        dataset[run]['obs']['swmf_sw']['Esw'].values/1e3)
         evCPCP  = np.interp(t_energy,t_log,
                         dataset[run]['obs']['swmf_log']['cpcpn'].values)
         evK1    = (mp['K_netK1 [W]']+mp['UtotM1 [W]'])/-1e12
+        evK     = (mp['K_netK1 [W]']+mp['UtotM1 [W]']+
+                   mp['K_netK5 [W]']+mp['UtotM5 [W]']-
+                   closed['K_netK7 [W]']+lobes['K_netK3 [W]'])/-1e12
         evU     = (mp['Utot [J]'])/1e15
         # Append subset of data to a full data array for further vis
         allK1       = np.append(allK1,evK1.values)
+        allK        = np.append(allK,evK.values)
         allEin      = np.append(allEin,evEin)
-        allEin2     = np.append(allEin2,evEin2)
+        allEsw     = np.append(allEsw,evEsw)
         allCPCP     = np.append(allCPCP,evCPCP)
         allU        = np.append(allU,evU)
     df_summary = pd.DataFrame({'Ein':allEin,
-                               'Ein2':allEin2,
+                               'Esw':allEsw,
                                'CPCP':allCPCP,
                                'U':allU,
-                               'K1':allK1})
+                               'K1':allK1,
+                               'K':allK})
     # Obtain low,50, and high %tiles, and variance binned by our X axis
     Ein_bins  = np.linspace(1,24,11)
-    Eindict   = bin_and_describe(df_summary['Ein'],df_summary['K1'],
-                               df_summary,Ein_bins,0.05,0.95)
+    Esw_bins  = np.linspace(df_summary['Esw'].quantile(0.005),
+                            df_summary['Esw'].quantile(0.995),11)
     CPCP_bins = np.linspace(df_summary['CPCP'].quantile(0.005),
                             df_summary['CPCP'].quantile(0.995),11)
     CPCPdict  = bin_and_describe(df_summary['CPCP'],df_summary['K1'],
                                  df_summary,CPCP_bins,0.05,0.95)
     Satdict   = bin_and_describe(df_summary['Ein'],df_summary['CPCP'],
                                  df_summary,Ein_bins,0.05,0.95)
+    Satdict2  = bin_and_describe(df_summary['Esw'],df_summary['CPCP'],
+                                 df_summary,Esw_bins,0.05,0.95)
     U_bins    = np.linspace(df_summary['U'].quantile(0.01),
                             df_summary['U'].quantile(0.99),11)
     Udict     = bin_and_describe(df_summary['U'],df_summary['K1'],
                                  df_summary,U_bins,0.05,0.95)
-    K_bins    = np.linspace(df_summary['K1'].quantile(0.01),
+    K1_bins   = np.linspace(df_summary['K1'].quantile(0.01),
                             df_summary['K1'].quantile(0.99),11)
-    Kdict     = bin_and_describe(df_summary['K1'],df_summary['U'],
+    K1dict    = bin_and_describe(df_summary['K1'],df_summary['U'],
+                                 df_summary,K1_bins,0.05,0.95)
+    K_bins    = np.linspace(df_summary['K'].quantile(0.01),
+                            df_summary['K'].quantile(0.99),11)
+    Kdict     = bin_and_describe(df_summary['K'],df_summary['U'],
                                  df_summary,K_bins,0.05,0.95)
+
+    test_Ein_bins = np.linspace(np.quantile(Ein,0.005),
+                                np.quantile(Ein,0.995),11)
+    test_Esw_bins = np.linspace(np.quantile(Esw,0.005),
+                                np.quantile(Esw,0.995),11)
+    test_U_bins = np.linspace(U.quantile(0.005),
+                              U.quantile(0.995),11)
+    test_Satdict  = bin_and_describe(pd.DataFrame(Ein),
+                                     pd.DataFrame(CPCP),
+                                   pd.DataFrame(CPCP),test_Ein_bins,0.05,0.95)
+    test_Satdict2 = bin_and_describe(pd.DataFrame(Esw),
+                                     pd.DataFrame(CPCP),
+                                   pd.DataFrame(CPCP),test_Esw_bins,0.05,0.95)
+    test_Udict = bin_and_describe(U,K1,K1,test_U_bins,0.05,0.95)
+
+    # Create Figures and Plots
+    fig1, ax1 = plt.subplots(figsize=[18,15])
+    fig2, ax2 = plt.subplots(figsize=[18,15])
+    fig3, ax3 = plt.subplots(figsize=[18,15])
+    # Draw on Plots
+
+    # Ax1
+    extended_fill_between(ax1,Ein_bins,Satdict['pLow_all'],
+                                       Satdict['pHigh_all'],'grey',0.2)
+    extended_fill_between(ax1,test_Ein_bins,test_Satdict['pLow_all'],
+                                            test_Satdict['pHigh_all'],
+                                            'gold',0.2)
+    ax1.plot(Ein_bins,Satdict['p50_all'],c='darkgrey',ls='--',lw=4)
+    ax1.plot(test_Ein_bins,test_Satdict['p50_all'],c='black',lw=4)
+    sc1 = ax1.scatter(Ein,CPCP,cmap=cm.managua,c=[t/60e9 for t in t_test],
+                      s=50,alpha=0.8)
+    cbar1 = plt.colorbar(sc1)
+    ax1.scatter(df_summary['Ein'],df_summary['CPCP'],
+                s=25,marker='x',c='grey',alpha=0.2)
+
+    # Ax2
+    extended_fill_between(ax2,Esw_bins,Satdict2['pLow_all'],
+                                       Satdict2['pHigh_all'],'grey',0.2)
+    extended_fill_between(ax2,test_Esw_bins,test_Satdict2['pLow_all'],
+                                            test_Satdict2['pHigh_all'],
+                                            'gold',0.2)
+    ax2.plot(Esw_bins,Satdict2['p50_all'],c='darkgrey',ls='--',lw=4)
+    ax2.plot(test_Esw_bins,test_Satdict2['p50_all'],c='black',lw=4)
+    sc2 = ax2.scatter(Esw,CPCP,cmap=cm.managua,c=[t/60e9 for t in t_test],
+                      s=50,alpha=0.8)
+    cbar2 = plt.colorbar(sc2)
+    ax2.scatter(df_summary['Esw'],df_summary['CPCP'],
+                s=25,marker='x',c='grey',alpha=0.2)
+
+    '''
+    # Ax2
+    extended_fill_between(ax2,K_bins,Kdict['pLow_all'],
+                                     Kdict['pHigh_all'],'grey',0.2)
+    ax2.plot(K_bins,Kdict['p50_all'],c='black',ls='--',lw=4)
+    sc2 = ax2.scatter(K,U,cmap=cm.managua,c=[t/60e9 for t in t_test],
+                      s=50,alpha=0.8)
+    cbar2 = plt.colorbar(sc2)
+    ax2.plot(decay_points,Upoints,c='purple')
+    '''
+
+    # Ax3
+    extended_fill_between(ax3,U_bins,Udict['pLow_all'],
+                                     Udict['pHigh_all'],'grey',0.2)
+    extended_fill_between(ax3,test_U_bins,test_Udict['pLow_all'],
+                                          test_Udict['pHigh_all'],
+                                          'gold',0.2)
+    ax3.plot(U_bins,Udict['p50_all'],c='darkgrey',ls='--',lw=4)
+    ax3.plot(test_U_bins,test_Udict['p50_all'],c='black',lw=4)
+    sc3 = ax3.scatter(U,K1,cmap=cm.managua,c=[t/60e9 for t in t_test],
+                      s=50,alpha=0.8)
+    cbar3 = plt.colorbar(sc3)
+    ax3.scatter(df_summary['U'],df_summary['K1'],
+                s=25,marker='x',c='grey',alpha=0.2)
+    #ax3.plot(Upoints,decay_points,c='purple')
+
+    # Decorate Plots
+    #ax1.set_xlim(0,25)
+    #ax1.set_ylim(0,25)
+    ax1.set_xlim(np.quantile(Ein,0.01),np.quantile(Ein,0.99))
+    ax1.set_ylim(np.quantile(CPCP,0.01),np.quantile(CPCP,0.99))
+    ax1.set_xlabel(r'$E_{in}\left[TW\right]$ Wang et al. 2014')
+    ax1.set_ylabel(r'CPCP $\left[kV\right]$')
+    cbar1.set_label(r'$\Delta t_{MIN}\left[min\right]$')
+
+    ax2.set_xlim(np.quantile(Esw,0.01),np.quantile(Esw,0.99))
+    ax2.set_ylim(np.quantile(CPCP,0.01),np.quantile(CPCP,0.99))
+    ax2.set_xlabel(r'$E_{sw}\left[mV/m\right]$ Kan and Lee 1979')
+    ax2.set_ylabel(r'CPCP $\left[kV\right]$')
+    cbar2.set_label(r'$\Delta t_{MIN}\left[min\right]$')
+
+    '''
+    #ax2.set_xlim(-5,75)
+    ax2.set_xlim(K.quantile(0.01),K.quantile(0.99))
+    ax2.set_xlabel(r'$\int\mathbf{K}_1$ Power $\left[TW\right]$')
+    ax2.set_ylabel(r'$\int\mathbf{U}$ Energy $\left[PJ\right]$')
+    cbar2.set_label(r'$\Delta t_{MIN}\left[min\right]$')
+    '''
+
+    ax3.set_xlim(U.quantile(0.01),U.quantile(0.99))
+    ax3.set_ylim(K1.quantile(0.01),K1.quantile(0.99))
+    ax3.set_xlabel(r'$\int\mathbf{U}$ Energy $\left[PJ\right]$')
+    ax3.set_ylabel(r'$\int\mathbf{K}_1$ Power $\left[TW\right]$')
+    cbar3.set_label(r'$\Delta t_{MIN}\left[min\right]$')
+
+
+    # Save Plots
+    fig1.tight_layout(pad=1)
+    figurename = path+'/cpcp_saturation.png'
+    fig1.savefig(figurename)
+    plt.close(fig1)
+    print('\033[92m Created\033[00m',figurename)
+
+    fig2.tight_layout(pad=1)
+    figurename = path+'/cpcp_saturation2.png'
+    fig2.savefig(figurename)
+    plt.close(fig2)
+    print('\033[92m Created\033[00m',figurename)
+
+    fig3.tight_layout(pad=1)
+    figurename = path+'/energy_vs_K1.png'
+    fig3.savefig(figurename)
+    plt.close(fig3)
+    print('\033[92m Created\033[00m',figurename)
+
     from IPython import embed; embed()
-    pass
+
+
 
 if __name__ == "__main__":
     # Setup paths and key times
     TINIT = dt.datetime(2024,5,9,6,0)
     TIMPACT = dt.datetime(2024,5,10,17)
     TDIVERGE = dt.datetime(2024,5,10,19,30)
+    TMIN  = dt.datetime(2024,5,11,2,15)
     inBase = os.path.realpath('..')+'/'
-    inLogs = os.path.join(inBase,'outputs/logs/')
-    inSats = os.path.join(inBase,'outputs/sat/')
-    inAnalysis = os.path.join(inBase,'outputs/analysis/')
+    inLogs = os.path.join(inBase,'data/logs/')
+    inSats = os.path.join(inBase,'data/sat/')
+    inAnalysis = os.path.join(inBase,'data/analysis/')
     outPath = os.path.join(inBase,'outputs/figures')
     unfiled = os.path.join(outPath,'unfiled')
     for path in [outPath,unfiled,]:
@@ -324,6 +480,7 @@ if __name__ == "__main__":
     closed = dataset['analysis']['msdict']['closed']
     lobes = dataset['analysis']['msdict']['lobes']
     plasmasheet = dataset['analysis']['msdict']['plasmasheet']
+    inner = dataset['analysis']['inner_mp']
     ## Reference Data
     events =[
              'stretched_LOWnLOWu',
