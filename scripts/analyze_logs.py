@@ -9,6 +9,8 @@ import pandas as pd
 from matplotlib import pyplot as plt
 #
 from global_energetics.analysis.plot_tools import (pyplotsetup,
+                                                   bin_and_describe,
+                                                   extended_fill_between,
                                                    general_plot_settings)
 from global_energetics.analysis.proc_satellites import(determine_satelliteIDs,
                                                        simdata_to_df,
@@ -199,6 +201,94 @@ def plot_satellites(themisA,themisD,themisE,
     plt.close(fig1)
     print('\033[92m Created\033[00m',figurename)
 
+def plot_saturation(mp_test,dataset,outPath):
+    # Basic data wrangling for the test set of data
+    # Get data to a common time axis
+    index_log = dataset['obs2']['swmf_log'].index
+    index_sw = dataset['obs2']['swmf_sw'].index
+    t_log = [float(t.to_numpy()) for t in index_log-TINIT]
+    t_sw = [float(t.to_numpy()) for t in index_sw-TINIT]
+    t_energy = [float(t.to_numpy()) for t in mp_test.index-TINIT]
+    # Extract the quantities for this subset of data
+    Ein  = np.interp(t_energy,t_sw,
+                     dataset['obs2']['swmf_sw']['EinWang'].values/1e12)
+    Ein2 = np.interp(t_energy,t_sw,
+                    -dataset['obs2']['swmf_sw']['Pstorm'].values/1e12)
+    CPCP = np.interp(t_energy,t_log,
+                     dataset['obs2']['swmf_log']['cpcpn'].values)
+    K1   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]'])/-1e12
+    U    = (mp_test['Utot [J]'])/1e15
+    # Initialize things for context data
+    T0 = dt.datetime(2022,6,6,0,0)
+    allK1 = np.array([])
+    allEin,allEin2 = np.array([]),np.array([])
+    allCPCP = np.array([])
+    allU    = np.array([])
+    testpoints = ['stretched_LOWnLOWu',
+                  'stretched_MEDnLOWu',
+                  'stretched_HIGHnLOWu',
+                  'stretched_LOWnMEDu',
+                  'stretched_MEDnMEDu',
+                  'stretched_HIGHnMEDu',
+                  'stretched_LOWnHIGHu',
+                  'stretched_MEDnHIGHu',
+                  'stretched_HIGHnHIGHu']
+    for i,run in enumerate(testpoints):
+        if run not in dataset.keys():
+            continue
+        # More data wrangling over the missing data times in the context data
+        tstart = T0+dt.timedelta(minutes=10)
+        mp = dataset[run]['mpdict']['ms_full'][
+                               dataset[run]['mpdict']['ms_full'].index>tstart]
+        mp = mp.resample('60S').asfreq()
+        # Get data to a common time axis
+        index_log = dataset[run]['obs']['swmf_log'].index
+        index_sw = dataset[run]['obs']['swmf_sw'].index
+        t_log = [float(t.to_numpy()) for t in index_log-T0]
+        t_sw = [float(t.to_numpy()) for t in index_sw-T0]
+        t_energy = [float(t.to_numpy()) for t in mp.index-T0]
+
+        # Extract the quantities for this subset of data
+        evEin   = np.interp(t_energy,t_sw,
+                        dataset[run]['obs']['swmf_sw']['EinWang'].values/1e12)
+        evEin2  = np.interp(t_energy,t_sw,
+                        -dataset[run]['obs']['swmf_sw']['Pstorm'].values/1e12)
+        evCPCP  = np.interp(t_energy,t_log,
+                        dataset[run]['obs']['swmf_log']['cpcpn'].values)
+        evK1    = (mp['K_netK1 [W]']+mp['UtotM1 [W]'])/-1e12
+        evU     = (mp['Utot [J]'])/1e15
+        # Append subset of data to a full data array for further vis
+        allK1       = np.append(allK1,evK1.values)
+        allEin      = np.append(allEin,evEin)
+        allEin2     = np.append(allEin2,evEin2)
+        allCPCP     = np.append(allCPCP,evCPCP)
+        allU        = np.append(allU,evU)
+    df_summary = pd.DataFrame({'Ein':allEin,
+                               'Ein2':allEin2,
+                               'CPCP':allCPCP,
+                               'U':allU,
+                               'K1':allK1})
+    # Obtain low,50, and high %tiles, and variance binned by our X axis
+    Ein_bins  = np.linspace(1,24,11)
+    Eindict   = bin_and_describe(df_summary['Ein'],df_summary['K1'],
+                               df_summary,Ein_bins,0.05,0.95)
+    CPCP_bins = np.linspace(df_summary['CPCP'].quantile(0.005),
+                            df_summary['CPCP'].quantile(0.995),11)
+    CPCPdict  = bin_and_describe(df_summary['CPCP'],df_summary['K1'],
+                                 df_summary,CPCP_bins,0.05,0.95)
+    Satdict   = bin_and_describe(df_summary['Ein'],df_summary['CPCP'],
+                                 df_summary,Ein_bins,0.05,0.95)
+    U_bins    = np.linspace(df_summary['U'].quantile(0.01),
+                            df_summary['U'].quantile(0.99),11)
+    Udict     = bin_and_describe(df_summary['U'],df_summary['K1'],
+                                 df_summary,U_bins,0.05,0.95)
+    K_bins    = np.linspace(df_summary['K1'].quantile(0.01),
+                            df_summary['K1'].quantile(0.99),11)
+    Kdict     = bin_and_describe(df_summary['K1'],df_summary['U'],
+                                 df_summary,K_bins,0.05,0.95)
+    from IPython import embed; embed()
+    pass
+
 if __name__ == "__main__":
     # Setup paths and key times
     TINIT = dt.datetime(2024,5,9,6,0)
@@ -234,7 +324,34 @@ if __name__ == "__main__":
     closed = dataset['analysis']['msdict']['closed']
     lobes = dataset['analysis']['msdict']['lobes']
     plasmasheet = dataset['analysis']['msdict']['plasmasheet']
-    '''
+    ## Reference Data
+    events =[
+             'stretched_LOWnLOWu',
+             'stretched_LOWnMEDu',
+             'stretched_LOWnHIGHu',
+             #
+             'stretched_HIGHnLOWu',
+             'stretched_HIGHnMEDu',
+             'stretched_HIGHnHIGHu',
+             #
+             'stretched_MEDnLOWu',
+             'stretched_MEDnMEDu',
+             'stretched_MEDnHIGHu',
+             'stretched_LOWnLOWucontinued',
+             ]
+    for event in events:
+        GMfile = os.path.join('../../parameter_study/data/analysis/',
+                              event+'.h5')
+        # GM data
+        if os.path.exists(GMfile):
+            dataset[event] = load_hdf_sort(GMfile)
+        # Log data
+        prefix = event.split('_')[1]+'_'
+        dataset[event]['obs']=read_indices('../../parameter_study/data/logs/',
+                                            prefix=prefix,
+                                        #start=dataset[event]['time'][0],
+                 #end=dataset[event]['time'][-1]+dt.timedelta(seconds=1),
+                                             read_supermag=False)
     ## Satellite data
     with pd.HDFStore(f'{inBase}scripts/themis_plasma.h5') as store:
         thb_plasma = store['/themisB']
@@ -251,7 +368,6 @@ if __name__ == "__main__":
     old_themisA = dataset['vsats1']['/themisA']
     old_themisD = dataset['vsats1']['/themisD']
     old_themisE = dataset['vsats1']['/themisE']
-    '''
 
     # Plot index results
     #plot_indices(sw,log,omni,outPath)
@@ -261,9 +377,12 @@ if __name__ == "__main__":
     #plot_standoff(mp,sw,sw2,outPath)
 
     # Plot energy flux
-    plot_energy_flux(mp,sw2,omni,log2,outPath)
+    #plot_energy_flux(mp,sw2,omni,log2,outPath)
 
     # Plot sat data
     #plot_satellites(themisA,themisD,themisE,
     #                old_themisA,old_themisD,old_themisE,
     #                outPath)
+
+    # Investigate energy input for saturation
+    plot_saturation(mp,dataset,outPath)
