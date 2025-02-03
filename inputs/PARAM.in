@@ -3,6 +3,7 @@ Name Root Last Stride nThread
 GM  0 -3 -1  -1         GM runs on 0:nProc-3 multithreaded
 IE -2 -1  1             IE runs on last 2 PE-s
 IM -2 -2  1             IM runs on nProc-2 PE
+RB -1 -1  1		! RB runs on nProc-1 PE
 
 #INCLUDE
 RESTART.in
@@ -34,11 +35,13 @@ T			DoCheckStop
 60 min		DtCheckStop
 
 #COUPLEORDER
-5			nCouple
+7			nCouple
 IE GM			NameSourceTarget
 IE IM			NameSourceTarget
+IE RB			NameSourceTarget
 GM IE			NameSourceTarget
 GM IM			NameSourceTarget
+GM RB			NameSourceTarget
 IM GM			NameSourceTarget
 
 #COUPLE2
@@ -59,6 +62,18 @@ IM			NameTarget
 -1			DnCouple
 10.0			DtCouple
 
+#COUPLE1
+GM			NameComp1
+RB			NameComp2
+-1			DnCouple
+10.0			DtCouple
+
+#COUPLE1
+IE			NameComp1
+RB			NameComp2
+-1			DnCouple
+10.0			DtCouple
+
 #COUPLETIME
 GM			NameComp
 F			DoCoupleOnTime
@@ -72,7 +87,7 @@ F			DoCoupleOnTime
 GM/restartIN/restart.H
 
 #GRIDBLOCKALL
-12000                    MaxBlock
+39000                    MaxBlock
 
 #GRID
 1			nRootBlock_D(x_)
@@ -139,9 +154,15 @@ paraboloidx
  35.0            Radius
 
 #GRIDRESOLUTION
+1/16			Resolution
+shell0			NameArea
+2.0			r1Shell
+3.0			r2Shell
+
+#GRIDRESOLUTION
 1/8			Resolution
 shell0			NameArea
-2.5			r1Shell
+3.0			r1Shell
 8.0			r2Shell
 
 ! reset the step counter to avoid accumulation to large numbers
@@ -159,6 +180,10 @@ float			TypeBc6
 #INNERBOUNDARY
 ionosphere		TypeBcInner
 
+! Set the inner boundary density with the Young formula
+YOUNGBOUNDARY
+T			UseYoungBc
+-1			F107Young
 
 ! Set the inner boundary density as Rho0Cpcp + RhoPerCpcp*CPCP[keV]
 #CPCPBOUNDARY
@@ -171,7 +196,7 @@ T                       UseCpcpBc  (rest is read if true)
 
 #SOLARWINDFILE
 T                       UseSolarWindFile
-mothersday_IMF.dat	NameSolarWindFile
+mothersday2_IMF.dat	NameSolarWindFile
 
 #TRACE
 T           UseTrace
@@ -206,7 +231,7 @@ dt rho mx my mz p bx by bz pmin pmax dst_sm dstflx cpcpn cpcps
 3.0			StringRFlux
 
 #DOAMR
-T			DoAmr
+F			DoAmr
 100			DnAmr
 -1			DtAmr
 T			IsStrictAmr
@@ -228,16 +253,16 @@ single			        TypeFileOut
 60.0			DtOutput      [sec]
 
 #MAGNETOMETERGRID
-1			nMagGridFile
-global real4		TypeFileMagGrid
-GSM			    TypeCoordMagGrid
-361			    nLonMagGrid
-181			    nLatMagGrid
-0.			    LonMinMagGrid
+1
+global ascii		TypeFileMagGrid
+MAG			TypeCoordMagGrid
+361			nLonMagGrid
+181			nLatMagGrid
+0.			LonMinMagGrid
 360.			LonMaxMagGrid
--90.			LatMinMagGrid
+-89.99			LatMinMagGrid
 90.			LatMaxMagGrid
--1			    DnSaveMagGrid
+-1			DnSaveMagGrid
 20.0			DtSaveMagGrid
 
 #SUPERMAGINDICES
@@ -278,18 +303,12 @@ IMCOUPLINGSMOOTH
 1e-5			pMinDim [nPa]
 
 #SAVEPLOT
-2                               nPlotFiles
-3d VAR tcp		                stringplot
--1			                    dnsaveplot
-1 min			                dtsaveplot
+1                               		nPlotFiles
+3d VAR tcp		                	stringplot
+-1			                    	dnsaveplot
+1 min			                	dtsaveplot
 {MHD} status theta1 theta2 phi1 phi2 dvol       namevars
-{default}                       namepars
-3d VAR idl		                stringplot
--1			                    dnsaveplot
-1 min			                dtsaveplot
--1			                    dxsaveplot
-{MHD} status theta1 theta2 phi1 phi2 dvol       namevars
-{default}                       namepars
+{default}                       		namepars
 
 #BORIS
 T			UseBorisCorrection
@@ -317,40 +336,66 @@ mc3			TypeLimiter
 2			nStage
 0.85			CflExpl
 
+#NONCONSERVATIVE
+T			UseNonConservative
+
+#CONSERVATIVECRITERIA
+1			nConservCrit
+parabola		TypeConservCrit
+5.0			xParabolaConserv
+15.0			yParabolaconserv
+
 #END_COMP GM -----------------------------------------------------------------
 
 #BEGIN_COMP IM ---------------------------------------------------------------
 
 #RESTART
-T			IsRestart
-T			DoRestartSat
+T			DoRestart
+
+! Number density fractions for H+ and O+, using the Young formula.
+#COMPOSITION
+FIXED			NameCompModel
+0.8			FractionH
+0.2			FractionO
+
+! Decay for RCM particle densities
+#DECAY
+T 			UseDecay
+10 hour			DecayTimescale
 
 #SAVEPLOT
-5			nCIMIFileType
-fls all			StringPlot
-60			DtOutput
-T			DoSaveSeparateFiles
-psd all			StringPlot
-60			DtOutput
-T			DoSaveSeparateFiles
-vp all			StringPlot
-60			DtOutput
-T			DoSaveSeparateFiles
-vl all			StringPlot
-60			DtOutput
-T			DoSaveSeparateFiles
-2d all			StringPlot
-60			DtOutput
-
-#SAVELOG
-10			DtSaveLog
+2
+2d max tec
+-1
+60
+3d max tec
+-1
+60
 
 #END_COMP IM -----------------------------------------------------------------
 
 #BEGIN_COMP IE ---------------------------------------------------------------
 
 #RESTART
-T			DoRestart
+T			            DoRestart
+
+#IONOSPHERE
+5			iConductanceModel
+F			UseFullCurrent
+F			UseFakeRegion2
+-1.0			F107Flux
+1.0			StarLightPedConductance
+0.25			PolarCapPedConductance
+
+#BOUNDARY
+10.0			LatBoundary
+
+#AURORALOVAL
+T			UseOval (rest of parameters read if true)
+T			UseOvalShift
+F			UseSubOvalConductance
+T			UseAdvancedOval
+F			DoFitCircle (read if UseAdvancedOval is true)
 
 #SAVEPLOT
 1			            nPlotFile
@@ -360,12 +405,46 @@ max tec                 StringPlot
 
 #END_COMP IE -----------------------------------------------------------------
 
+#BEGIN_COMP RB ---------------------------------------------------------------
+
+#RESTART
+T           DoRestart
+
+#INCLUDE
+RB/restartIN/restart.H
+
+#SAVEPLOT
+1 min			DtSavePlot
+T			UseSeparatePlotFiles
+
+#TIMESTEP
+3.0			Dt
+
+#STARTUPTIME
+0.0			trans
+
+#BMODEL
+MHD			NameModel
+F			UseFixedB
+
+#LIMITER
+T			UseMcLimiter
+2			BetaLimiter
+
+#IEMODEL
+2			iConvect
+
+#PLASMASPHERE
+F			UsePlasmaSphere
+
+#END_COMP RB -----------------------------------------------------------------
+
 #ENDTIME            
 2024			year
 5			    month
-10 			    day
-8			    hour
-30 			    minute
+11 			    day
+17			    hour
+0 			    minute
 0			    second
 0			    fracsecond
 

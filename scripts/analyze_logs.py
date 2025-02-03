@@ -214,17 +214,20 @@ def plot_saturation(mp_test,dataset,outPath):
     inner_test = dataset['analysis']['inner_mp']
     closed_test = dataset['analysis']['msdict']['closed']
     lobes_test = dataset['analysis']['msdict']['lobes']
-    Ein  = np.interp(t_test,t_sw,
-                     dataset['obs2']['swmf_sw']['EinWang'].values/1e12)
-    Esw = np.interp(t_test,t_sw,
-                     dataset['obs2']['swmf_sw']['Esw'].values/1e3)
-    CPCP = np.interp(t_test,t_log,
-                     dataset['obs2']['swmf_log']['cpcpn'].values)
     K1   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]'])/-1e12
-    K   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']+
+    K    = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']+
            mp_test['K_netK5 [W]']+mp_test['UtotM5 [W]']+
            closed_test['K_netK7 [W]']+lobes_test['K_netK3 [W]'])/-1e12
     U    = (mp_test['Utot [J]'])/1e15
+    Ein  = pd.Series(index=K1.index,
+                     data=np.interp(t_test,t_sw,
+                           dataset['obs2']['swmf_sw']['EinWang'].values/1e12))
+    Esw  = pd.Series(index=K1.index,
+                     data=np.interp(t_test,t_sw,
+                                dataset['obs2']['swmf_sw']['Esw'].values/1e3))
+    CPCP = pd.Series(index=K1.index,
+                     data=np.interp(t_test,t_log,
+                                 dataset['obs2']['swmf_log']['cpcpn'].values))
     Upoints = np.linspace(20,85,100)
     decay_points = Upoints*1e3/(60*60*10)
     # Initialize things for context data
@@ -286,7 +289,7 @@ def plot_saturation(mp_test,dataset,outPath):
         allEsw     = np.append(allEsw,evEsw)
         allCPCP     = np.append(allCPCP,evCPCP)
         allU        = np.append(allU,evU)
-    df_summary = pd.DataFrame({'Ein':allEin,
+    df_reference = pd.DataFrame({'Ein':allEin,
                                'Esw':allEsw,
                                'CPCP':allCPCP,
                                'U':allU,
@@ -294,42 +297,35 @@ def plot_saturation(mp_test,dataset,outPath):
                                'K':allK})
     # Obtain low,50, and high %tiles, and variance binned by our X axis
     Ein_bins  = np.linspace(1,24,11)
-    Esw_bins  = np.linspace(df_summary['Esw'].quantile(0.005),
-                            df_summary['Esw'].quantile(0.995),11)
-    CPCP_bins = np.linspace(df_summary['CPCP'].quantile(0.005),
-                            df_summary['CPCP'].quantile(0.995),11)
-    CPCPdict  = bin_and_describe(df_summary['CPCP'],df_summary['K1'],
-                                 df_summary,CPCP_bins,0.05,0.95)
-    Satdict   = bin_and_describe(df_summary['Ein'],df_summary['CPCP'],
-                                 df_summary,Ein_bins,0.05,0.95)
-    Satdict2  = bin_and_describe(df_summary['Esw'],df_summary['CPCP'],
-                                 df_summary,Esw_bins,0.05,0.95)
-    U_bins    = np.linspace(df_summary['U'].quantile(0.01),
-                            df_summary['U'].quantile(0.99),11)
-    Udict     = bin_and_describe(df_summary['U'],df_summary['K1'],
-                                 df_summary,U_bins,0.05,0.95)
-    K1_bins   = np.linspace(df_summary['K1'].quantile(0.01),
-                            df_summary['K1'].quantile(0.99),11)
-    K1dict    = bin_and_describe(df_summary['K1'],df_summary['U'],
-                                 df_summary,K1_bins,0.05,0.95)
-    K_bins    = np.linspace(df_summary['K'].quantile(0.01),
-                            df_summary['K'].quantile(0.99),11)
-    Kdict     = bin_and_describe(df_summary['K'],df_summary['U'],
-                                 df_summary,K_bins,0.05,0.95)
+    Esw_bins  = np.linspace(df_reference['Esw'].quantile(0.005),
+                            df_reference['Esw'].quantile(0.995),11)
+    CPCP_bins = np.linspace(df_reference['CPCP'].quantile(0.005),
+                            df_reference['CPCP'].quantile(0.995),11)
+    CPCPdict  = bin_and_describe(df_reference['CPCP'],df_reference['K1'],
+                                 df_reference,CPCP_bins,0.05,0.95)
+    Satdict   = bin_and_describe(df_reference['Ein'],df_reference['CPCP'],
+                                 df_reference,Ein_bins,0.05,0.95)
+    Satdict2  = bin_and_describe(df_reference['Esw'],df_reference['CPCP'],
+                                 df_reference,Esw_bins,0.05,0.95)
+    U_bins    = np.linspace(df_reference['U'].quantile(0.01),
+                            df_reference['U'].quantile(0.99),11)
+    Udict     = bin_and_describe(df_reference['U'],df_reference['K1'],
+                                 df_reference,U_bins,0.05,0.95)
+    K1_bins   = np.linspace(df_reference['K1'].quantile(0.01),
+                            df_reference['K1'].quantile(0.99),11)
+    K1dict    = bin_and_describe(df_reference['K1'],df_reference['U'],
+                                 df_reference,K1_bins,0.05,0.95)
+    K_bins    = np.linspace(df_reference['K'].quantile(0.01),
+                            df_reference['K'].quantile(0.99),11)
+    Kdict     = bin_and_describe(df_reference['K'],df_reference['U'],
+                                 df_reference,K_bins,0.05,0.95)
 
-    test_Ein_bins = np.linspace(np.quantile(Ein,0.005),
-                                np.quantile(Ein,0.995),11)
-    test_Esw_bins = np.linspace(np.quantile(Esw,0.005),
-                                np.quantile(Esw,0.995),11)
-    test_U_bins = np.linspace(U.quantile(0.005),
-                              U.quantile(0.995),11)
-    test_Satdict  = bin_and_describe(pd.DataFrame(Ein),
-                                     pd.DataFrame(CPCP),
-                                   pd.DataFrame(CPCP),test_Ein_bins,0.05,0.95)
-    test_Satdict2 = bin_and_describe(pd.DataFrame(Esw),
-                                     pd.DataFrame(CPCP),
-                                   pd.DataFrame(CPCP),test_Esw_bins,0.05,0.95)
-    test_Udict = bin_and_describe(U,K1,K1,test_U_bins,0.05,0.95)
+    test_Ein_bins = np.linspace(Ein.quantile(0.005),Ein.quantile(0.995),11)
+    test_Esw_bins = np.linspace(Esw.quantile(0.005),Esw.quantile(0.995),11)
+    test_U_bins   = np.linspace(U.quantile(0.005),U.quantile(0.995),11)
+    test_Satdict  = bin_and_describe(Ein,CPCP,CPCP,test_Ein_bins,0.05,0.95)
+    test_Satdict2 = bin_and_describe(Esw,CPCP,CPCP,test_Esw_bins,0.05,0.95)
+    test_Udict    = bin_and_describe(U,K1,K1,test_U_bins,0.05,0.95)
 
     # Create Figures and Plots
     fig1, ax1 = plt.subplots(figsize=[18,15])
@@ -348,7 +344,7 @@ def plot_saturation(mp_test,dataset,outPath):
     sc1 = ax1.scatter(Ein,CPCP,cmap=cm.managua,c=[t/60e9 for t in t_test],
                       s=50,alpha=0.8)
     cbar1 = plt.colorbar(sc1)
-    ax1.scatter(df_summary['Ein'],df_summary['CPCP'],
+    ax1.scatter(df_reference['Ein'],df_reference['CPCP'],
                 s=25,marker='x',c='grey',alpha=0.2)
 
     # Ax2
@@ -362,7 +358,7 @@ def plot_saturation(mp_test,dataset,outPath):
     sc2 = ax2.scatter(Esw,CPCP,cmap=cm.managua,c=[t/60e9 for t in t_test],
                       s=50,alpha=0.8)
     cbar2 = plt.colorbar(sc2)
-    ax2.scatter(df_summary['Esw'],df_summary['CPCP'],
+    ax2.scatter(df_reference['Esw'],df_reference['CPCP'],
                 s=25,marker='x',c='grey',alpha=0.2)
 
     '''
@@ -387,21 +383,21 @@ def plot_saturation(mp_test,dataset,outPath):
     sc3 = ax3.scatter(U,K1,cmap=cm.managua,c=[t/60e9 for t in t_test],
                       s=50,alpha=0.8)
     cbar3 = plt.colorbar(sc3)
-    ax3.scatter(df_summary['U'],df_summary['K1'],
+    ax3.scatter(df_reference['U'],df_reference['K1'],
                 s=25,marker='x',c='grey',alpha=0.2)
     #ax3.plot(Upoints,decay_points,c='purple')
 
     # Decorate Plots
     #ax1.set_xlim(0,25)
     #ax1.set_ylim(0,25)
-    ax1.set_xlim(np.quantile(Ein,0.01),np.quantile(Ein,0.99))
-    ax1.set_ylim(np.quantile(CPCP,0.01),np.quantile(CPCP,0.99))
+    ax1.set_xlim(Ein.quantile(0.01),Ein.quantile(0.99))
+    ax1.set_ylim(CPCP.quantile(0.01),CPCP.quantile(0.99))
     ax1.set_xlabel(r'$E_{in}\left[TW\right]$ Wang et al. 2014')
     ax1.set_ylabel(r'CPCP $\left[kV\right]$')
     cbar1.set_label(r'$\Delta t_{MIN}\left[min\right]$')
 
-    ax2.set_xlim(np.quantile(Esw,0.01),np.quantile(Esw,0.99))
-    ax2.set_ylim(np.quantile(CPCP,0.01),np.quantile(CPCP,0.99))
+    ax2.set_xlim(Esw.quantile(0.01),Esw.quantile(0.99))
+    ax2.set_ylim(CPCP.quantile(0.01),CPCP.quantile(0.99))
     ax2.set_xlabel(r'$E_{sw}\left[mV/m\right]$ Kan and Lee 1979')
     ax2.set_ylabel(r'CPCP $\left[kV\right]$')
     cbar2.set_label(r'$\Delta t_{MIN}\left[min\right]$')
