@@ -3,24 +3,29 @@ Name Root Last Stride nThread
 GM  0 -3 -1  -1         GM runs on 0:nProc-3 multithreaded
 IE -2 -1  1             IE runs on last 2 PE-s
 IM -2 -2  1             IM runs on nProc-2 PE
+RB -1 -1  1		! RB runs on nProc-1 PE
 
 #DESCRIPTION
-Preconditioning for text matrix runs
+Gannon storm with RB initial PARAM
 
 #TIMEACCURATE
 F			DoTimeAccurate
 
 #STARTTIME            
-2024		year
+2024			year
 5			month
 10			day
-6			hour
+13			hour
 0 			minute
 0			second
 0			fracsecond
 
 #COMPONENT
 IM			NameComp
+F			UseComp
+
+#COMPONENT
+RB			NameComp
 F			UseComp
 
 #COUPLE2
@@ -32,7 +37,7 @@ IE			NameComp2
 #BEGIN_COMP GM ---------------------------------------------------------------
 
 #GRIDBLOCKALL
-12000                    MaxBlock
+39000                    MaxBlock
 
 #GRID
 1			nRootBlock_D(x_)
@@ -99,15 +104,21 @@ paraboloidx
  35.0            Radius
 
 #GRIDRESOLUTION
+1/16			Resolution
+shell0			NameArea
+2.0			r1Shell
+3.0			r2Shell
+
+#GRIDRESOLUTION
 1/8			Resolution
 shell0			NameArea
-2.5			r1Shell
+3.0			r1Shell
 8.0			r2Shell
 
 #BODY
 T                       UseBody
-2.5                     rBody     (in planet radius)
-3.0                     rCurrents (in planet radius)
+2.0                     rBody     (in planet radius)
+2.375                   rCurrents (in planet radius)
 28.0                    BodyNDim  (/cc)
 25000.0                 BodyTDim  (K)
 
@@ -141,14 +152,14 @@ T                       UseCpcpBc  (rest is read if true)
 
 #SOLARWINDFILE
 T                       UseSolarWindFile
-mothersday_IMF.dat	NameSolarWindFile
+mothersday2_IMF.dat	NameSolarWindFile
 
 #SCHEME
 1			      nOrder
 Sokolov			TypeFlux
 
 #NONCONSERVATIVE
-F                       UseNonConservative
+T                       UseNonConservative
 
 #CONSERVATIVECRITERIA
 1			nConservCrit
@@ -211,16 +222,16 @@ single			        TypeFileOut
 60.0			DtOutput      [sec]
 
 #MAGNETOMETERGRID
-1			nMagGridFile
-global real4		TypeFileMagGrid
-GSM			    TypeCoordMagGrid
-361			    nLonMagGrid
-181			    nLatMagGrid
-0.			    LonMinMagGrid
+1			nFiles
+global ascii		TypeFileMagGrid
+MAG			TypeCoordMagGrid
+361			nLonMagGrid
+181			nLatMagGrid
+0.			LonMinMagGrid
 360.			LonMaxMagGrid
 -90.			LatMinMagGrid
 90.			LatMaxMagGrid
--1			    DnSaveMagGrid
+-1			DnSaveMagGrid
 20.0			DtSaveMagGrid
 
 ! Satellite trajectories
@@ -322,7 +333,7 @@ T                       DoCheckTimeStep
 #SAVERESTART
 T           DoSaveRestart
 -1			DnSaveRestart
-3 hour		DtSaveRestart
+2 hour		DtSaveRestart
 
 MAKEDIR
 F            NameRestartOutDir
@@ -339,13 +350,19 @@ T			DoCheckStop
 IM			NameComp
 T			UseComp
 
+#COMPONENT
+RB			NameComp
+T			UseComp
+
 ! Allow GM/IM and IE run in parallel. 
 #COUPLEORDER
-5			nCouple
+7			nCouple
 IE GM			NameSourceTarget
 IE IM			NameSourceTarget
+IE RB			NameSourceTarget
 GM IE			NameSourceTarget
 GM IM			NameSourceTarget
+GM RB			NameSourceTarget
 IM GM			NameSourceTarget
 
 #COUPLE2
@@ -363,6 +380,18 @@ GM			NameComp2
 #COUPLE1
 IE			NameComp1
 IM			NameComp2
+-1			DnCouple
+10.0			DtCouple
+
+#COUPLE1
+GM			NameComp1
+RB			NameComp2
+-1			DnCouple
+10.0			DtCouple
+
+#COUPLE1
+IE			NameComp1
+RB			NameComp2
 -1			DnCouple
 10.0			DtCouple
 
@@ -406,16 +435,10 @@ IMCOUPLINGSMOOTH
 1e-5			pMinDim [nPa]
 
 #SAVEPLOT
-2                               nPlotFiles
+1                               nPlotFiles
 3d VAR tcp		                stringplot
 -1			                    dnsaveplot
 1 min			                dtsaveplot
-{MHD} status theta1 theta2 phi1 phi2 dvol       namevars
-{default}                       namepars
-3d VAR idl		                stringplot
--1			                    dnsaveplot
-1 min			                dtsaveplot
--1			                    dxsaveplot
 {MHD} status theta1 theta2 phi1 phi2 dvol       namevars
 {default}                       namepars
 
@@ -443,66 +466,25 @@ borisregion		NameBorisRegion
 
 #BEGIN_COMP IM ---------------------------------------------------------------
 
-#TYPEBOUNDARY
-ellipse			TypeBoundary
-
-#SETBOUNDARYPARAMS
-2.0			DeltaRmax
-2.0			DeltaMLTmax
-
-#PRERUNFIELD
-T			DoWritePrerun
-F			UsePrerun
-60			DtRead
-
-#PRERUNSAT
-T			DoWritePrerun
-F			UsePrerunSat
-60			DtReadSat
-
-#DECAY
-T 			UseDecay
-36000. 			DecayTimescale in seconds
-
+! Number density fractions for H+ and O+, using the Young formula.
 #COMPOSITION
 FIXED			NameCompModel
-0.80			Fraction H+
-0.20			Fraction O+
-1.0			Fraction e-
+0.8			FractionH
+0.2			FractionO
 
-#SETENERGYGRID
-31			neng
-T			UseLogEGrid
-0.1			MinIonEnergy (keV)
-420			MaxIonEnergy (keV)
+! Decay for RCM particle densities
+#DECAY
+T 			UseDecay
+10 hour			DecayTimescale
 
 #SAVEPLOT
-5			nCIMIFileType
-fls all			StringPlot
-60			DtOutput
-T			DoSaveSeparateFiles
-psd all			StringPlot
-60			DtOutput
-T			DoSaveSeparateFiles
-vp all			StringPlot
-60			DtOutput
-T			DoSaveSeparateFiles
-vl all			StringPlot
-60			DtOutput
-T			DoSaveSeparateFiles
-2d all			StringPlot
-60			DtOutput
-
-#SAVELOG
-10			DtSaveLog
-
-WAVEDIFFUSION
-F			UseWaveDiffusion
-T			UseHiss
-T			UseChorus
-D_hiss_UCLA.dat		HissWavesD
-D_LBchorus_merge3.dat	ChorusWavesD
-T			UseKpIndex
+2
+2d max tec
+-1
+60
+3d max tec
+-1
+60
 
 #END_COMP IM -----------------------------------------------------------------
 
@@ -516,12 +498,47 @@ max tec                 StringPlot
 
 #END_COMP IE -----------------------------------------------------------------
 
+#BEGIN_COMP RB ---------------------------------------------------------------
+
+#RESTART
+F			IsRestart
+
+#SAVEPLOT
+1 min			DtSavePlot
+T			UseSeparatePlotFiles
+
+#TIMESTEP
+3.0			Dt
+
+#SPECIES
+e			NameSpecies
+
+#STARTUPTIME
+0.0			trans
+
+#BMODEL
+MHD			NameModel
+F			UseFixedB
+
+#LIMITER
+T			UseMcLimiter
+2			BetaLimiter
+
+#IEMODEL
+2			iConvect
+
+#PLASMASPHERE
+F			UsePlasmaSphere
+
+#END_COMP RB -----------------------------------------------------------------
+
+
 #ENDTIME            
-2024			year
+2024			    year
 5			    month
-10 			    day
-6			    hour
-30 			    minute
+11 			    day
+13			    hour
+0 			    minute
 0			    second
 0			    fracsecond
 

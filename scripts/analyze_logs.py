@@ -210,6 +210,8 @@ def plot_saturation(mp_test,dataset,outPath):
     t_log = [float(t.to_numpy()) for t in index_log-TMIN]
     t_sw = [float(t.to_numpy()) for t in index_sw-TMIN]
     t_test = [float(t.to_numpy()) for t in mp_test.index-TMIN]
+    t_ie   = [float(t.to_numpy()) for t in
+                                   dataset['analysis']['currents'].index-TMIN]
     # Extract the quantities for this subset of data
     inner_test = dataset['analysis']['inner_mp']
     closed_test = dataset['analysis']['msdict']['closed']
@@ -228,6 +230,11 @@ def plot_saturation(mp_test,dataset,outPath):
     CPCP = pd.Series(index=K1.index,
                      data=np.interp(t_test,t_log,
                                  dataset['obs2']['swmf_log']['cpcpn'].values))
+    FAC  = (dataset['analysis']['currents']['up_north_A']+
+            dataset['analysis']['currents']['up_south_A']+
+            dataset['analysis']['currents']['down_north_A']+
+            dataset['analysis']['currents']['down_south_A'])/1e3
+    FAC  = pd.Series(index=K1.index,data=np.interp(t_test,t_ie,FAC.values))
     Upoints = np.linspace(20,85,100)
     decay_points = Upoints*1e3/(60*60*10)
     # Initialize things for context data
@@ -322,15 +329,23 @@ def plot_saturation(mp_test,dataset,outPath):
 
     test_Ein_bins = np.linspace(Ein.quantile(0.005),Ein.quantile(0.995),11)
     test_Esw_bins = np.linspace(Esw.quantile(0.005),Esw.quantile(0.995),11)
+    test_FAC_bins = np.linspace(FAC.quantile(0.005),FAC.quantile(0.995),11)
     test_U_bins   = np.linspace(U.quantile(0.005),U.quantile(0.995),11)
+    test_K1_bins  = np.linspace(K1.quantile(0.005),K1.quantile(0.995),11)
     test_Satdict  = bin_and_describe(Ein,CPCP,CPCP,test_Ein_bins,0.05,0.95)
     test_Satdict2 = bin_and_describe(Esw,CPCP,CPCP,test_Esw_bins,0.05,0.95)
+    test_Satdict3 = bin_and_describe(Ein,FAC,FAC,test_Ein_bins,0.05,0.95)
+    test_Satdict4 = bin_and_describe(FAC,CPCP,CPCP,test_FAC_bins,0.05,0.95)
+    test_Convert  = bin_and_describe(K1,FAC,FAC,test_K1_bins,0.05,0.95)
     test_Udict    = bin_and_describe(U,K1,K1,test_U_bins,0.05,0.95)
 
     # Create Figures and Plots
     fig1, ax1 = plt.subplots(figsize=[18,15])
     fig2, ax2 = plt.subplots(figsize=[18,15])
     fig3, ax3 = plt.subplots(figsize=[18,15])
+    fig4, ax4 = plt.subplots(figsize=[18,15])
+    fig5, ax5 = plt.subplots(figsize=[18,15])
+    fig6, ax6 = plt.subplots(figsize=[18,15])
     # Draw on Plots
 
     # Ax1
@@ -341,7 +356,7 @@ def plot_saturation(mp_test,dataset,outPath):
                                             'gold',0.2)
     ax1.plot(Ein_bins,Satdict['p50_all'],c='darkgrey',ls='--',lw=4)
     ax1.plot(test_Ein_bins,test_Satdict['p50_all'],c='black',lw=4)
-    sc1 = ax1.scatter(Ein,CPCP,cmap=cm.managua,c=[t/60e9 for t in t_test],
+    sc1 = ax1.scatter(Ein,CPCP,cmap=cm.managua,c=[t/3600e9 for t in t_test],
                       s=50,alpha=0.8)
     cbar1 = plt.colorbar(sc1)
     ax1.scatter(df_reference['Ein'],df_reference['CPCP'],
@@ -355,22 +370,12 @@ def plot_saturation(mp_test,dataset,outPath):
                                             'gold',0.2)
     ax2.plot(Esw_bins,Satdict2['p50_all'],c='darkgrey',ls='--',lw=4)
     ax2.plot(test_Esw_bins,test_Satdict2['p50_all'],c='black',lw=4)
-    sc2 = ax2.scatter(Esw,CPCP,cmap=cm.managua,c=[t/60e9 for t in t_test],
+    sc2 = ax2.scatter(Esw,CPCP,cmap=cm.managua,c=[t/3600e9 for t in t_test],
                       s=50,alpha=0.8)
     cbar2 = plt.colorbar(sc2)
     ax2.scatter(df_reference['Esw'],df_reference['CPCP'],
                 s=25,marker='x',c='grey',alpha=0.2)
 
-    '''
-    # Ax2
-    extended_fill_between(ax2,K_bins,Kdict['pLow_all'],
-                                     Kdict['pHigh_all'],'grey',0.2)
-    ax2.plot(K_bins,Kdict['p50_all'],c='black',ls='--',lw=4)
-    sc2 = ax2.scatter(K,U,cmap=cm.managua,c=[t/60e9 for t in t_test],
-                      s=50,alpha=0.8)
-    cbar2 = plt.colorbar(sc2)
-    ax2.plot(decay_points,Upoints,c='purple')
-    '''
 
     # Ax3
     extended_fill_between(ax3,U_bins,Udict['pLow_all'],
@@ -380,12 +385,40 @@ def plot_saturation(mp_test,dataset,outPath):
                                           'gold',0.2)
     ax3.plot(U_bins,Udict['p50_all'],c='darkgrey',ls='--',lw=4)
     ax3.plot(test_U_bins,test_Udict['p50_all'],c='black',lw=4)
-    sc3 = ax3.scatter(U,K1,cmap=cm.managua,c=[t/60e9 for t in t_test],
+    sc3 = ax3.scatter(U,K1,cmap=cm.managua,c=[t/3600e9 for t in t_test],
                       s=50,alpha=0.8)
     cbar3 = plt.colorbar(sc3)
     ax3.scatter(df_reference['U'],df_reference['K1'],
                 s=25,marker='x',c='grey',alpha=0.2)
     #ax3.plot(Upoints,decay_points,c='purple')
+
+    # Ax4
+    extended_fill_between(ax4,test_Ein_bins,test_Satdict3['pLow_all'],
+                                            test_Satdict3['pHigh_all'],
+                                            'gold',0.2)
+    ax4.plot(test_Ein_bins,test_Satdict3['p50_all'],c='black',lw=4)
+    sc4 = ax4.scatter(Ein,FAC,cmap=cm.managua,c=[t/3600e9 for t in t_test],
+                      s=50,alpha=0.8)
+    cbar4 = plt.colorbar(sc4)
+
+    # Ax5
+    extended_fill_between(ax5,test_K1_bins,test_Convert['pLow_all'],
+                                           test_Convert['pHigh_all'],
+                                            'gold',0.2)
+    ax5.plot(test_K1_bins,test_Convert['p50_all'],c='black',lw=4)
+    sc5 = ax5.scatter(K1,FAC,cmap=cm.managua,c=[t/3600e9 for t in t_test],
+                      s=50,alpha=0.8)
+    cbar5 = plt.colorbar(sc5)
+
+    # Ax6
+    extended_fill_between(ax6,test_FAC_bins,test_Satdict4['pLow_all'],
+                                            test_Satdict4['pHigh_all'],
+                                            'gold',0.2)
+    ax6.plot(test_FAC_bins,test_Satdict4['p50_all'],c='black',lw=4)
+    sc6 = ax6.scatter(FAC,CPCP,cmap=cm.managua,c=[t/3600e9 for t in t_test],
+                      s=50,alpha=0.8)
+    cbar6 = plt.colorbar(sc6)
+
 
     # Decorate Plots
     #ax1.set_xlim(0,25)
@@ -402,19 +435,30 @@ def plot_saturation(mp_test,dataset,outPath):
     ax2.set_ylabel(r'CPCP $\left[kV\right]$')
     cbar2.set_label(r'$\Delta t_{MIN}\left[min\right]$')
 
-    '''
-    #ax2.set_xlim(-5,75)
-    ax2.set_xlim(K.quantile(0.01),K.quantile(0.99))
-    ax2.set_xlabel(r'$\int\mathbf{K}_1$ Power $\left[TW\right]$')
-    ax2.set_ylabel(r'$\int\mathbf{U}$ Energy $\left[PJ\right]$')
-    cbar2.set_label(r'$\Delta t_{MIN}\left[min\right]$')
-    '''
-
     ax3.set_xlim(U.quantile(0.01),U.quantile(0.99))
     ax3.set_ylim(K1.quantile(0.01),K1.quantile(0.99))
     ax3.set_xlabel(r'$\int\mathbf{U}$ Energy $\left[PJ\right]$')
     ax3.set_ylabel(r'$\int\mathbf{K}_1$ Power $\left[TW\right]$')
     cbar3.set_label(r'$\Delta t_{MIN}\left[min\right]$')
+
+    ax4.set_xlim(Ein.quantile(0.01),Ein.quantile(0.99))
+    ax4.set_ylim(FAC.quantile(0.01),FAC.quantile(0.99))
+    ax4.set_xlabel(r'$E_{in}\left[TW\right]$ Wang et al. 2014')
+    ax4.set_ylabel(r'$\int$FAC $\left[kA\right]$')
+    cbar4.set_label(r'$\Delta t_{MIN}\left[hr\right]$')
+
+    ax5.set_xlim(K1.quantile(0.01),K1.quantile(0.99))
+    ax5.set_ylim(FAC.quantile(0.01),FAC.quantile(0.99))
+    ax5.set_xlabel(r'$\int\mathbf{K}_1$ Power $\left[TW\right]$')
+    ax5.set_ylabel(r'$\int$FAC $\left[kA\right]$')
+    cbar5.set_label(r'$\Delta t_{MIN}\left[hr\right]$')
+
+    ax6.set_xlim(FAC.quantile(0.01),FAC.quantile(0.99))
+    ax6.set_ylim(CPCP.quantile(0.01),CPCP.quantile(0.99))
+    ax6.set_xlabel(r'$\int$FAC $\left[kA\right]$')
+    ax6.set_ylabel(r'CPCP $\left[kV\right]$')
+    cbar6.set_label(r'$\Delta t_{MIN}\left[hr\right]$')
+
 
 
     # Save Plots
@@ -436,7 +480,23 @@ def plot_saturation(mp_test,dataset,outPath):
     plt.close(fig3)
     print('\033[92m Created\033[00m',figurename)
 
-    from IPython import embed; embed()
+    fig4.tight_layout(pad=1)
+    figurename = path+'/cpcp_saturation3.png'
+    fig4.savefig(figurename)
+    plt.close(fig4)
+    print('\033[92m Created\033[00m',figurename)
+
+    fig5.tight_layout(pad=1)
+    figurename = path+'/energy_conversion.png'
+    fig5.savefig(figurename)
+    plt.close(fig5)
+    print('\033[92m Created\033[00m',figurename)
+
+    fig6.tight_layout(pad=1)
+    figurename = path+'/fac_conversion.png'
+    fig6.savefig(figurename)
+    plt.close(fig6)
+    print('\033[92m Created\033[00m',figurename)
 
 
 
@@ -445,7 +505,7 @@ if __name__ == "__main__":
     TINIT = dt.datetime(2024,5,9,6,0)
     TIMPACT = dt.datetime(2024,5,10,17)
     TDIVERGE = dt.datetime(2024,5,10,19,30)
-    TMIN  = dt.datetime(2024,5,11,2,15)
+    TMIN  = dt.datetime(2024,5,11,1,30)
     inBase = os.path.realpath('..')+'/'
     inLogs = os.path.join(inBase,'data/logs/')
     inSats = os.path.join(inBase,'data/sat/')
@@ -472,6 +532,9 @@ if __name__ == "__main__":
     omni = dataset['obs2']['omni']
     ## Analysis Data
     dataset['analysis'] = load_hdf_sort(inAnalysis+'energetics.h5')
+    with pd.HDFStore(inAnalysis+'integrated_currents.h5') as store:
+        dataset['analysis']['currents'] = store['/FAC']
+
     mp = dataset['analysis']['mpdict']['ms_full']
     closed = dataset['analysis']['msdict']['closed']
     lobes = dataset['analysis']['msdict']['lobes']
@@ -538,4 +601,5 @@ if __name__ == "__main__":
     #                outPath)
 
     # Investigate energy input for saturation
-    plot_saturation(mp,dataset,outPath)
+    #plot_saturation(mp,dataset,outPath)
+    from IPython import embed; embed()
