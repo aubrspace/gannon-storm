@@ -210,13 +210,12 @@ def plot_saturation(mp_test,dataset,outPath):
     t_log = [float(t.to_numpy()) for t in index_log-TMIN]
     t_sw = [float(t.to_numpy()) for t in index_sw-TMIN]
     t_test = [float(t.to_numpy()) for t in mp_test.index-TMIN]
-    t_ie   = [float(t.to_numpy()) for t in
-                                   dataset['analysis']['currents'].index-TMIN]
     # Extract the quantities for this subset of data
     inner_test = dataset['analysis']['inner_mp']
     closed_test = dataset['analysis']['msdict']['closed']
     lobes_test = dataset['analysis']['msdict']['lobes']
-    K1   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]'])/-1e12
+    #K1   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']).resample('300s').mean()/-1e12
+    K1   = mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']
     K    = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']+
            mp_test['K_netK5 [W]']+mp_test['UtotM5 [W]']+
            closed_test['K_netK7 [W]']+lobes_test['K_netK3 [W]'])/-1e12
@@ -230,13 +229,63 @@ def plot_saturation(mp_test,dataset,outPath):
     CPCP = pd.Series(index=K1.index,
                      data=np.interp(t_test,t_log,
                                  dataset['obs2']['swmf_log']['cpcpn'].values))
-    FAC  = (dataset['analysis']['currents']['up_north_A']+
-            dataset['analysis']['currents']['up_south_A']+
-            dataset['analysis']['currents']['down_north_A']+
-            dataset['analysis']['currents']['down_south_A'])/1e3
+    FAC  = (dataset['analysis']['currents']['up_north_MA']+
+            #dataset['analysis']['currents']['up_south_MA']+
+            dataset['analysis']['currents']['down_north_MA'])
+            #dataset['analysis']['currents']['down_south_MA'])
+    #.resample('300s').mean()
+    t_ie   = [float(t.to_numpy()) for t in FAC.index-TMIN]
     FAC  = pd.Series(index=K1.index,data=np.interp(t_test,t_ie,FAC.values))
+    R1   = (abs(dataset['analysis']['currents']['UP_R1_N'])+
+            abs(dataset['analysis']['currents']['DOWN_R1_N']))
+            #abs(dataset['analysis']['currents']['UP_R1_S'])+
+            #abs(dataset['analysis']['currents']['DOWN_R1_N']))
+    #.resample('300s').mean()
+    R1  = pd.Series(index=K1.index,data=np.interp(t_test,t_ie,R1.values))
+    R2   = (abs(dataset['analysis']['currents']['UP_R2_N'])+
+            abs(dataset['analysis']['currents']['DOWN_R2_N']))
+            #abs(dataset['analysis']['currents']['UP_R2_S'])+
+            #abs(dataset['analysis']['currents']['DOWN_R2_N']))
+    #.resample('300s').mean()
+    R2  = pd.Series(index=K1.index,data=np.interp(t_test,t_ie,R2.values))
     Upoints = np.linspace(20,85,100)
     decay_points = Upoints*1e3/(60*60*10)
+    voltages = dataset['analysis']['voltages']
+    V = pd.DataFrame()
+    Vmatch = pd.DataFrame()
+    for key in voltages.keys():
+        if all(voltages[key].isna()):
+            continue
+        t_v = [float(t.to_numpy()) for t in
+                     dataset['analysis']['voltages'][key].dropna().index-TMIN]
+        series = pd.Series(index=K1.index,data=np.interp(t_test,t_v,
+                           voltages[key].dropna().values))
+        s5min  = abs(series).resample('300s').mean()
+        V[key] = s5min
+        t_match = [float(t.to_numpy()) for t in V[key].index-TMIN]
+        Vmatch[key] = pd.Series(index=K1.index,data=np.interp(t_test,t_match,
+                                                               V[key].values))
+    from IPython import embed; embed()
+    #TODO
+    #   Make nice plot of Vmatch (mean of null values?) vs:
+    #       FAC
+    #       CPCP
+    #       Esw
+    #       Esw*mp_width
+    #   Calculate distance across max/min potentials
+    #       color above maps by this distance
+    #       compare that distance vs mp_width
+    #   Figure out how to separate out R1 and R2 currents
+    #       in the IE results:
+    #           try finding countours around zero potential
+    #           take the two 'inner most' as R1
+    #           take the two 'outer most' as R2
+    #           split any remaining 'unknown' across both, but record
+    #   Finally:
+    #       See if Esw   <-> FAC_R1 is 1-1
+    #              V_eff <-> FAC_R1 is 1-1
+    #              R2    <-> Utot   is 1-1 (or maybe some other observable?)
+    #              Esw   <-> CPCP is 1-1 given an FAC_R2 level
     # Initialize things for context data
     T0 = dt.datetime(2022,6,6,0,0)
     allK1 = np.array([])
@@ -260,16 +309,16 @@ def plot_saturation(mp_test,dataset,outPath):
         tstart = T0+dt.timedelta(minutes=10)
         mp = dataset[run]['mpdict']['ms_full'][
                                dataset[run]['mpdict']['ms_full'].index>tstart]
-        mp = mp.resample('60S').asfreq()
+        mp = mp.resample('60s').asfreq()
         inner = dataset[run]['inner_mp'][
                                dataset[run]['inner_mp'].index>tstart]
-        inner = inner.resample('60S').asfreq()
+        inner = inner.resample('60s').asfreq()
         closed = dataset[run]['msdict']['closed'][
                                dataset[run]['msdict']['closed'].index>tstart]
-        closed = closed.resample('60S').asfreq()
+        closed = closed.resample('60s').asfreq()
         lobes = dataset[run]['msdict']['lobes'][
                                dataset[run]['msdict']['lobes'].index>tstart]
-        lobes = lobes.resample('60S').asfreq()
+        lobes = lobes.resample('60s').asfreq()
         # Get data to a common time axis
         index_log = dataset[run]['obs']['swmf_log'].index
         index_sw = dataset[run]['obs']['swmf_sw'].index
@@ -346,6 +395,7 @@ def plot_saturation(mp_test,dataset,outPath):
     fig4, ax4 = plt.subplots(figsize=[18,15])
     fig5, ax5 = plt.subplots(figsize=[18,15])
     fig6, ax6 = plt.subplots(figsize=[18,15])
+    fig7, [ax7_top,ax7_bot] = plt.subplots(2,1,figsize=[20,15],sharex=True)
     # Draw on Plots
 
     # Ax1
@@ -358,7 +408,7 @@ def plot_saturation(mp_test,dataset,outPath):
     ax1.plot(test_Ein_bins,test_Satdict['p50_all'],c='black',lw=4)
     sc1 = ax1.scatter(Ein,CPCP,cmap=cm.managua,c=[t/3600e9 for t in t_test],
                       s=50,alpha=0.8)
-    cbar1 = plt.colorbar(sc1)
+    cbar1 = fig1.colorbar(sc1)
     ax1.scatter(df_reference['Ein'],df_reference['CPCP'],
                 s=25,marker='x',c='grey',alpha=0.2)
 
@@ -372,7 +422,7 @@ def plot_saturation(mp_test,dataset,outPath):
     ax2.plot(test_Esw_bins,test_Satdict2['p50_all'],c='black',lw=4)
     sc2 = ax2.scatter(Esw,CPCP,cmap=cm.managua,c=[t/3600e9 for t in t_test],
                       s=50,alpha=0.8)
-    cbar2 = plt.colorbar(sc2)
+    cbar2 = fig2.colorbar(sc2)
     ax2.scatter(df_reference['Esw'],df_reference['CPCP'],
                 s=25,marker='x',c='grey',alpha=0.2)
 
@@ -387,7 +437,7 @@ def plot_saturation(mp_test,dataset,outPath):
     ax3.plot(test_U_bins,test_Udict['p50_all'],c='black',lw=4)
     sc3 = ax3.scatter(U,K1,cmap=cm.managua,c=[t/3600e9 for t in t_test],
                       s=50,alpha=0.8)
-    cbar3 = plt.colorbar(sc3)
+    cbar3 = fig3.colorbar(sc3)
     ax3.scatter(df_reference['U'],df_reference['K1'],
                 s=25,marker='x',c='grey',alpha=0.2)
     #ax3.plot(Upoints,decay_points,c='purple')
@@ -399,7 +449,7 @@ def plot_saturation(mp_test,dataset,outPath):
     ax4.plot(test_Ein_bins,test_Satdict3['p50_all'],c='black',lw=4)
     sc4 = ax4.scatter(Ein,FAC,cmap=cm.managua,c=[t/3600e9 for t in t_test],
                       s=50,alpha=0.8)
-    cbar4 = plt.colorbar(sc4)
+    cbar4 = fig4.colorbar(sc4)
 
     # Ax5
     extended_fill_between(ax5,test_K1_bins,test_Convert['pLow_all'],
@@ -408,7 +458,7 @@ def plot_saturation(mp_test,dataset,outPath):
     ax5.plot(test_K1_bins,test_Convert['p50_all'],c='black',lw=4)
     sc5 = ax5.scatter(K1,FAC,cmap=cm.managua,c=[t/3600e9 for t in t_test],
                       s=50,alpha=0.8)
-    cbar5 = plt.colorbar(sc5)
+    cbar5 = fig5.colorbar(sc5)
 
     # Ax6
     extended_fill_between(ax6,test_FAC_bins,test_Satdict4['pLow_all'],
@@ -417,7 +467,14 @@ def plot_saturation(mp_test,dataset,outPath):
     ax6.plot(test_FAC_bins,test_Satdict4['p50_all'],c='black',lw=4)
     sc6 = ax6.scatter(FAC,CPCP,cmap=cm.managua,c=[t/3600e9 for t in t_test],
                       s=50,alpha=0.8)
-    cbar6 = plt.colorbar(sc6)
+    cbar6 = fig6.colorbar(sc6)
+
+    # Ax7
+    ax7_top.plot(FAC.index,FAC,c='gold',lw=4,label='FAC')
+    ax7_bot.plot(V.index,V['dV_Null_N'],c='black',label='Null_N')
+    ax7_bot.plot(V.index,V['dV_Null_S'],c='grey',label='Null_N')
+    ax7_bot.plot(V.index,V['dV_Bstream_N'],c='red',label='Jpar_N')
+    ax7_bot.plot(V.index,V['dV_Bstream_S'],c='blue',label='Jpar_S')
 
 
     # Decorate Plots
@@ -444,20 +501,28 @@ def plot_saturation(mp_test,dataset,outPath):
     ax4.set_xlim(Ein.quantile(0.01),Ein.quantile(0.99))
     ax4.set_ylim(FAC.quantile(0.01),FAC.quantile(0.99))
     ax4.set_xlabel(r'$E_{in}\left[TW\right]$ Wang et al. 2014')
-    ax4.set_ylabel(r'$\int$FAC $\left[kA\right]$')
+    ax4.set_ylabel(r'$\int$FAC $\left[MA\right]$')
     cbar4.set_label(r'$\Delta t_{MIN}\left[hr\right]$')
 
     ax5.set_xlim(K1.quantile(0.01),K1.quantile(0.99))
     ax5.set_ylim(FAC.quantile(0.01),FAC.quantile(0.99))
     ax5.set_xlabel(r'$\int\mathbf{K}_1$ Power $\left[TW\right]$')
-    ax5.set_ylabel(r'$\int$FAC $\left[kA\right]$')
+    ax5.set_ylabel(r'$\int$FAC $\left[MA\right]$')
     cbar5.set_label(r'$\Delta t_{MIN}\left[hr\right]$')
 
     ax6.set_xlim(FAC.quantile(0.01),FAC.quantile(0.99))
     ax6.set_ylim(CPCP.quantile(0.01),CPCP.quantile(0.99))
-    ax6.set_xlabel(r'$\int$FAC $\left[kA\right]$')
+    ax6.set_xlabel(r'$\int$FAC $\left[MA\right]$')
     ax6.set_ylabel(r'CPCP $\left[kV\right]$')
     cbar6.set_label(r'$\Delta t_{MIN}\left[hr\right]$')
+
+    ax7_top.set_ylabel(r'Current $\left[MA\right]$')
+    ax7_bot.set_xlim(dt.datetime(2024,5,10,14,0),
+                     dt.datetime(2024,5,11,14,0))
+    #ax7_bot.set_ylim([0,2000])
+    ax7_bot.legend()
+    ax7_bot.set_xlabel(r'Time')
+    ax7_bot.set_ylabel(r'Voltage $\left[kV\right]$')
 
 
 
@@ -498,6 +563,12 @@ def plot_saturation(mp_test,dataset,outPath):
     plt.close(fig6)
     print('\033[92m Created\033[00m',figurename)
 
+    fig7.tight_layout(pad=1)
+    figurename = path+'/fac_vs_voltage.png'
+    fig7.savefig(figurename)
+    plt.close(fig7)
+    print('\033[92m Created\033[00m',figurename)
+
 
 
 if __name__ == "__main__":
@@ -518,12 +589,14 @@ if __name__ == "__main__":
     plt.rcParams.update(pyplotsetup(mode='print'))
     ## Log Data
     dataset = {}
+    '''NOTE this is the old run w/ other settings
     dataset['obs'] = read_indices(inLogs+'temp/',start=TINIT,
                                   end=TIMPACT+dt.timedelta(hours=24),
                                   read_supermag=False)
     sw = dataset['obs']['swmf_sw']
     log = dataset['obs']['swmf_log']
     omni = dataset['obs']['omni']
+    '''
     dataset['obs2'] = read_indices(inLogs,start=TINIT,
                                   end=TIMPACT+dt.timedelta(hours=24),
                                   read_supermag=False)
@@ -585,6 +658,10 @@ if __name__ == "__main__":
     old_themisD = dataset['vsats1']['/themisD']
     old_themisE = dataset['vsats1']['/themisE']
 
+    ## Voltage data
+    with pd.HDFStore(f'{inAnalysis}voltage_results.h5') as store:
+        dataset['analysis']['voltages'] = store['/voltages']
+
     # Plot index results
     #plot_indices(sw,log,omni,outPath)
     #plot_indices(sw2,log2,omni,outPath+'/unfiled/')
@@ -601,5 +678,4 @@ if __name__ == "__main__":
     #                outPath)
 
     # Investigate energy input for saturation
-    #plot_saturation(mp,dataset,outPath)
-    from IPython import embed; embed()
+    plot_saturation(mp,dataset,outPath)
