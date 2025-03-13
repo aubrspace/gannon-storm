@@ -21,6 +21,7 @@ from global_energetics.analysis.proc_satellites import(determine_satelliteIDs,
 from global_energetics.analysis.proc_indices import read_indices
 from global_energetics.analysis.proc_hdf import load_hdf_sort
 from global_energetics.extract.shue import r0_alpha_1998
+from global_energetics.analysis.proc_ampere import read_currents
 
 def plot_indices(sw,log,omni,path):
     #setup figure
@@ -202,6 +203,89 @@ def plot_satellites(themisA,themisD,themisE,
     plt.close(fig1)
     print('\033[92m Created\033[00m',figurename)
 
+def plot_data_compare(dataset: dict,outPath: dict) -> None:
+    I_swmf  = dataset['analysis']['currents']
+    I_ampere = dataset['ampere']
+    # Create Figures and Plots
+    fig1, ax1 = plt.subplots(figsize=[22,15])
+    fig2, [ax2a,ax2b] = plt.subplots(2,1,figsize=[22,18])
+
+    ## Draw plots
+    # Ax1
+    ax1.plot(I_swmf.index,I_swmf['up_north_MA'],label='SWMF_N',
+             c='blue')
+    ax1.plot(I_swmf.index,-I_swmf['down_north_MA'],label='_SWMF_N_down',
+             c='blue',ls='--')
+    ax1.plot(I_swmf.index,I_swmf['up_south_MA'],label='SWMF_S',
+             c='purple')
+    ax1.plot(I_swmf.index,-I_swmf['down_south_MA'],label='_SWMF_S_down',
+             c='purple',ls='--')
+
+    ax1.plot(I_ampere.index,I_ampere['I_total_up_North_[MA]'],
+             label='AMPERE_N',c='red')
+    ax1.plot(I_ampere.index,I_ampere['I_total_down_North_[MA]'],
+             label='_AMPERE_N_down',c='red',ls='--')
+    ax1.plot(I_ampere.index,I_ampere['I_total_up_South_[MA]'],
+             label='AMPERE_S',c='orange')
+    ax1.plot(I_ampere.index,I_ampere['I_total_down_South_[MA]'],
+             label='_AMPERE_S_down',c='orange',ls='--')
+
+    # Ax2a
+    ax2a.plot(I_swmf.index,I_swmf['UP_R1_N'],label='SWMF_N',
+             c='blue')
+    ax2a.plot(I_swmf.index,I_swmf['DOWN_R1_N'],label='_SWMF_N_down',
+             c='blue',ls='--')
+    ax2a.plot(I_swmf.index,I_swmf['UP_R1_S'],label='SWMF_S',
+             c='purple')
+    ax2a.plot(I_swmf.index,I_swmf['DOWN_R1_S'],label='_SWMF_S_down',
+             c='purple',ls='--')
+    # Ax2b
+    ax2b.plot(I_swmf.index,I_swmf['UP_R2_N'],label='SWMF_N',
+             c='blue')
+    ax2b.plot(I_swmf.index,I_swmf['DOWN_R2_N'],label='_SWMF_N_down',
+             c='blue',ls='--')
+    ax2b.plot(I_swmf.index,I_swmf['UP_R2_S'],label='SWMF_S',
+             c='purple')
+    ax2b.plot(I_swmf.index,I_swmf['DOWN_R2_S'],label='_SWMF_S_down',
+             c='purple',ls='--')
+
+
+    # Decorate Plots
+    general_plot_settings(ax1,do_xlabel=True,legend=False,
+                          xlabel=r'Time $\left[Day-Hr\right]$',
+                          ylabel=r'$\int$FAC $\left[MA\right]$',
+                          xlim=[TINIT,TEND], timdelta=False)
+    ax1.legend(loc='lower right', bbox_to_anchor=(1.0, 1.05),
+                    ncol=4, fancybox=True, shadow=True)
+
+    general_plot_settings(ax2a,do_xlabel=True,legend=False,
+                          xlabel=r'Time $\left[Day-Hr\right]$',
+                          ylabel=r'$\int$R1 $\left[MA\right]$',
+                          xlim=[TINIT,TEND], timdelta=False)
+    ax2a.legend(loc='lower right', bbox_to_anchor=(1.0, 1.05),
+                    ncol=4, fancybox=True, shadow=True)
+
+    general_plot_settings(ax2b,do_xlabel=True,legend=False,
+                          xlabel=r'Time $\left[Day-Hr\right]$',
+                          ylabel=r'$\int$R2 $\left[MA\right]$',
+                          xlim=[TINIT,TEND], timdelta=False)
+    ax2b.legend(loc='lower right', bbox_to_anchor=(1.0, 1.05),
+                    ncol=4, fancybox=True, shadow=True)
+
+    # Save Plots
+    fig1.tight_layout(pad=1)
+    figurename = path+'/ampere_compare_1.png'
+    fig1.savefig(figurename)
+    plt.close(fig1)
+    print('\033[92m Created\033[00m',figurename)
+
+    fig2.tight_layout(pad=1)
+    figurename = path+'/ampere_compare_2.png'
+    fig2.savefig(figurename)
+    plt.close(fig2)
+    print('\033[92m Created\033[00m',figurename)
+
+
 def plot_saturation(mp_test,dataset,outPath):
     # Basic data wrangling for the test set of data
     # Get data to a common time axis
@@ -215,7 +299,7 @@ def plot_saturation(mp_test,dataset,outPath):
     closed_test = dataset['analysis']['msdict']['closed']
     lobes_test = dataset['analysis']['msdict']['lobes']
     #K1   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']).resample('300s').mean()/-1e12
-    K1   = mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']
+    K1   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]'])/-1e12
     K    = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']+
            mp_test['K_netK5 [W]']+mp_test['UtotM5 [W]']+
            closed_test['K_netK7 [W]']+lobes_test['K_netK3 [W]'])/-1e12
@@ -233,6 +317,9 @@ def plot_saturation(mp_test,dataset,outPath):
             #dataset['analysis']['currents']['up_south_MA']+
             dataset['analysis']['currents']['down_north_MA'])
             #dataset['analysis']['currents']['down_south_MA'])
+    MA   = pd.Series(index=K1.index,
+                     data=np.interp(t_test,t_sw,
+                                 dataset['obs2']['swmf_sw']['Ma'].values))
     #.resample('300s').mean()
     t_ie   = [float(t.to_numpy()) for t in FAC.index-TMIN]
     FAC  = pd.Series(index=K1.index,data=np.interp(t_test,t_ie,FAC.values))
@@ -265,7 +352,6 @@ def plot_saturation(mp_test,dataset,outPath):
         t_match = [float(t.to_numpy()) for t in V[key].index-TMIN]
         Vmatch[key] = pd.Series(index=K1.index,data=np.interp(t_test,t_match,
                                                                V[key].values))
-    from IPython import embed; embed()
     #TODO
     #   Make nice plot of Vmatch (mean of null values?) vs:
     #       FAC
@@ -290,9 +376,10 @@ def plot_saturation(mp_test,dataset,outPath):
     T0 = dt.datetime(2022,6,6,0,0)
     allK1 = np.array([])
     allK = np.array([])
-    allEin,allEsw = np.array([]),np.array([])
+    allEin,allEsw,allMa = np.array([]),np.array([]),np.array([])
     allCPCP = np.array([])
     allU    = np.array([])
+    allFAC    = np.array([])
     testpoints = ['stretched_LOWnLOWu',
                   'stretched_MEDnLOWu',
                   'stretched_HIGHnLOWu',
@@ -322,15 +409,19 @@ def plot_saturation(mp_test,dataset,outPath):
         # Get data to a common time axis
         index_log = dataset[run]['obs']['swmf_log'].index
         index_sw = dataset[run]['obs']['swmf_sw'].index
+        index_fac = dataset[run]['currents'].index
         t_log = [float(t.to_numpy()) for t in index_log-T0]
         t_sw = [float(t.to_numpy()) for t in index_sw-T0]
         t_energy = [float(t.to_numpy()) for t in mp.index-T0]
+        t_fac = [float(t.to_numpy()) for t in index_fac-T0]
 
         # Extract the quantities for this subset of data
         evEin   = np.interp(t_energy,t_sw,
                         dataset[run]['obs']['swmf_sw']['EinWang'].values/1e12)
         evEsw   = np.interp(t_energy,t_sw,
                         dataset[run]['obs']['swmf_sw']['Esw'].values/1e3)
+        evMa    = np.interp(t_energy,t_sw,
+                        dataset[run]['obs']['swmf_sw']['Ma'].values)
         evCPCP  = np.interp(t_energy,t_log,
                         dataset[run]['obs']['swmf_log']['cpcpn'].values)
         evK1    = (mp['K_netK1 [W]']+mp['UtotM1 [W]'])/-1e12
@@ -338,19 +429,27 @@ def plot_saturation(mp_test,dataset,outPath):
                    mp['K_netK5 [W]']+mp['UtotM5 [W]']-
                    closed['K_netK7 [W]']+lobes['K_netK3 [W]'])/-1e12
         evU     = (mp['Utot [J]'])/1e15
+        evFAC = np.interp(t_energy,t_fac,
+                                    dataset[run]['currents']['up_north_MA']+
+                                    dataset[run]['currents']['down_north_MA'])
         # Append subset of data to a full data array for further vis
         allK1       = np.append(allK1,evK1.values)
         allK        = np.append(allK,evK.values)
         allEin      = np.append(allEin,evEin)
-        allEsw     = np.append(allEsw,evEsw)
+        allEsw      = np.append(allEsw,evEsw)
+        allMa       = np.append(allMa,evMa)
         allCPCP     = np.append(allCPCP,evCPCP)
         allU        = np.append(allU,evU)
+        allFAC      = np.append(allFAC,evFAC)
     df_reference = pd.DataFrame({'Ein':allEin,
                                'Esw':allEsw,
+                               'Ma':allMa,
                                'CPCP':allCPCP,
                                'U':allU,
                                'K1':allK1,
-                               'K':allK})
+                               'K':allK,
+                               'FAC':allFAC})
+    from IPython import embed; embed()
     # Obtain low,50, and high %tiles, and variance binned by our X axis
     Ein_bins  = np.linspace(1,24,11)
     Esw_bins  = np.linspace(df_reference['Esw'].quantile(0.005),
@@ -447,9 +546,14 @@ def plot_saturation(mp_test,dataset,outPath):
                                             test_Satdict3['pHigh_all'],
                                             'gold',0.2)
     ax4.plot(test_Ein_bins,test_Satdict3['p50_all'],c='black',lw=4)
-    sc4 = ax4.scatter(Ein,FAC,cmap=cm.managua,c=[t/3600e9 for t in t_test],
+    #sc4 = ax4.scatter(Ein,FAC,cmap=cm.managua,c=[t/3600e9 for t in t_test],
+    sc4 = ax4.scatter(Ein,FAC,cmap=cm.managua,c=MA,
                       s=50,alpha=0.8)
     cbar4 = fig4.colorbar(sc4)
+    sc4b = ax4.scatter(df_reference['Ein'],df_reference['FAC'],
+                #s=25,marker='x',c='grey',alpha=0.2)
+                s=25,marker='x',c=df_reference['Ma'],alpha=0.2)
+    cbar4b = fig4.colorbar(sc4b)
 
     # Ax5
     extended_fill_between(ax5,test_K1_bins,test_Convert['pLow_all'],
@@ -459,6 +563,8 @@ def plot_saturation(mp_test,dataset,outPath):
     sc5 = ax5.scatter(K1,FAC,cmap=cm.managua,c=[t/3600e9 for t in t_test],
                       s=50,alpha=0.8)
     cbar5 = fig5.colorbar(sc5)
+    ax5.scatter(df_reference['K1'],df_reference['FAC'],
+                s=25,marker='x',c='grey',alpha=0.2)
 
     # Ax6
     extended_fill_between(ax6,test_FAC_bins,test_Satdict4['pLow_all'],
@@ -468,6 +574,8 @@ def plot_saturation(mp_test,dataset,outPath):
     sc6 = ax6.scatter(FAC,CPCP,cmap=cm.managua,c=[t/3600e9 for t in t_test],
                       s=50,alpha=0.8)
     cbar6 = fig6.colorbar(sc6)
+    ax6.scatter(df_reference['FAC'],df_reference['CPCP'],
+                s=25,marker='x',c='grey',alpha=0.2)
 
     # Ax7
     ax7_top.plot(FAC.index,FAC,c='gold',lw=4,label='FAC')
@@ -573,10 +681,12 @@ def plot_saturation(mp_test,dataset,outPath):
 
 if __name__ == "__main__":
     # Setup paths and key times
-    TINIT = dt.datetime(2024,5,9,6,0)
+    #TINIT = dt.datetime(2024,5,9,6,0)
+    TINIT = dt.datetime(2024,5,10,12,0)
     TIMPACT = dt.datetime(2024,5,10,17)
     TDIVERGE = dt.datetime(2024,5,10,19,30)
     TMIN  = dt.datetime(2024,5,11,1,30)
+    TEND  = dt.datetime(2024,5,11,18)
     inBase = os.path.realpath('..')+'/'
     inLogs = os.path.join(inBase,'data/logs/')
     inSats = os.path.join(inBase,'data/sat/')
@@ -629,18 +739,22 @@ if __name__ == "__main__":
              'stretched_LOWnLOWucontinued',
              ]
     for event in events:
-        GMfile = os.path.join('../../parameter_study/data/analysis/',
-                              event+'.h5')
+        ideal_runs_path = '../../parameter_study/data'
+        GMfile = os.path.join(f'{ideal_runs_path}/analysis/',event+'.h5')
         # GM data
         if os.path.exists(GMfile):
             dataset[event] = load_hdf_sort(GMfile)
         # Log data
         prefix = event.split('_')[1]+'_'
-        dataset[event]['obs']=read_indices('../../parameter_study/data/logs/',
+        dataset[event]['obs']=read_indices(f'{ideal_runs_path}/logs/',
                                             prefix=prefix,
                                         #start=dataset[event]['time'][0],
                  #end=dataset[event]['time'][-1]+dt.timedelta(seconds=1),
                                              read_supermag=False)
+        # IE data
+        FACfile = f"{event.split('stretched_')[1]}_integrated_currents.h5"
+        with pd.HDFStore(f"{ideal_runs_path}/analysis/IE/{FACfile}") as store:
+            dataset[event]['currents'] = store['/FAC']
     ## Satellite data
     with pd.HDFStore(f'{inBase}scripts/themis_plasma.h5') as store:
         thb_plasma = store['/themisB']
@@ -657,6 +771,15 @@ if __name__ == "__main__":
     old_themisA = dataset['vsats1']['/themisA']
     old_themisD = dataset['vsats1']['/themisD']
     old_themisE = dataset['vsats1']['/themisE']
+
+    ## AMPERE data
+    ampere_path = '../data/ampere'
+    all_data = pd.DataFrame()
+    for infile in glob.glob(f"{ampere_path}/*.dat"):
+        df = read_currents(infile)
+        all_data = pd.concat([all_data,df])
+    all_data = all_data.replace(9999.00,np.nan)
+    dataset['ampere'] = all_data
 
     ## Voltage data
     with pd.HDFStore(f'{inAnalysis}voltage_results.h5') as store:
@@ -678,4 +801,7 @@ if __name__ == "__main__":
     #                outPath)
 
     # Investigate energy input for saturation
-    plot_saturation(mp,dataset,outPath)
+    #plot_saturation(mp,dataset,outPath)
+
+    # Compare with data
+    plot_data_compare(dataset,outPath)
