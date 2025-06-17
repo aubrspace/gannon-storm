@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Analyze and plot data for the parameter study of ideal runs
+"""Analyze and plot data from the Gannon storm
 """
 import os,sys,glob,time
 import numpy as np
 from numpy import sin,cos,deg2rad,rad2deg,pi
+import scipy
+import statsmodels.api as sm
 import datetime as dt
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -18,12 +20,12 @@ from global_energetics.analysis.proc_satellites import(determine_satelliteIDs,
                                                        add_derived_variables,
                                                        split_themis)
 
-from global_energetics.analysis.proc_indices import read_indices
+from global_energetics.analysis.proc_indices import read_indices,read_pc
 from global_energetics.analysis.proc_hdf import load_hdf_sort
 from global_energetics.extract.shue import r0_alpha_1998
 from global_energetics.analysis.proc_ampere import read_currents
 
-def plot_indices(sw,log,omni,path):
+def plot_indices(sw,log,omni,pc,path):
     #setup figure
     indices,(axis1,axis2,axis3,axis4) =plt.subplots(4,1,figsize=[20,20],
                                                     sharex=True)
@@ -32,27 +34,33 @@ def plot_indices(sw,log,omni,path):
     axis1.plot(sw.index,sw['bx'],label='Bx',c='red')
     axis1.plot(sw.index,sw['by'],label='By',c='blue')
     axis1.plot(sw.index,sw['bz'],label='Bz',c='cyan',lw=3)
-    axis2.plot(log.index,log['cpcpn'],label='North',c='blue',lw=3)
-    axis2.plot(log.index,log['cpcps'],label='South',c='red',lw=1.5)
-    axis3.plot(omni.index,omni['sym_h'],label='Sym-H',c='black',lw=3)
-    axis3.plot(log.index,log['dst_sm'],label='Dst',c='purple',lw=1.5)
-    axis4.fill_between(sw.index,sw['EinWang']/1e12,label='Ein_Wang2014',
+    axis2.plot(omni.index,omni['sym_h'],label='Sym-H',c='black',lw=3)
+    axis2.plot(log.index,log['dst_sm'],label='SWMF',c='magenta',lw=1.5)
+    axis3.fill_between(sw.index,sw['EinWang']/1e12,label='Ein_Wang2014',
                        fc='purple')
+    axis4.plot(pc.index,pc['cpcpn'],label='Ridley&Kihn',c='black',lw=3)
+    axis4.plot(pc.index,pc['cpcps'],label='_Ridley&Kihn',c='black',lw=1.5,
+                                                                      ls='--')
+    axis4.plot(log.index,log['cpcpn'],label='SWMF_N',c='magenta',lw=3)
+    axis4.plot(log.index,log['cpcps'],label='_SWMF_S',c='magenta',lw=1.5,
+                                                                      ls='--')
 
     for ax in [axis1,axis2,axis3,axis4]:
         ax.margins(x=0.01)
-        ax.axvline(TIMPACT,c='blue')
-        ax.axvline(TDIVERGE,c='red')
+        #ax.axvline(TIMPACT,c='blue')
+        #ax.axvline(TDIVERGE,c='red')
     general_plot_settings(axis1,do_xlabel=False,legend=True,
-                          xlim=[TIMPACT-dt.timedelta(hours=0.5),
-                                TIMPACT+dt.timedelta(hours=24)],
+                          xlim=[TINIT,TEND],
                           ylabel=r'B $\left[nT\right]$',timedelta=False)
+    axis1.legend(loc='lower right', bbox_to_anchor=(1.0, 1.05),
+                     ncol=4, fancybox=True, shadow=True)
     general_plot_settings(axis2,do_xlabel=False,legend=True,
-                          ylabel=r'CPCP $\left[kV\right]$',timedelta=False)
-    general_plot_settings(axis3,do_xlabel=False,legend=True,
                     ylabel=r'$\Delta B$ $\left[nT\right]$',timedelta=False)
-    general_plot_settings(axis4,do_xlabel=True,legend=True,
+    general_plot_settings(axis3,do_xlabel=False,legend=True,
                          ylabel=r'Power $\left[TW\right]$',timedelta=False)
+    general_plot_settings(axis4,do_xlabel=True,legend=True,
+                          ylim=[0,700],
+                          ylabel=r'CPCP $\left[kV\right]$',timedelta=False)
     indices.tight_layout(pad=1)
     figurename = f'{path}/indices.png'
     indices.savefig(figurename)
@@ -61,8 +69,7 @@ def plot_indices(sw,log,omni,path):
 
 def plot_energy_flux(mp,sw,omni,log,path):
     # Set window
-    window = [TIMPACT-dt.timedelta(hours=2),
-              TIMPACT+dt.timedelta(hours=24)]
+    window = [TINIT,TEND]
     # Make plots for comparisons
     eflux,(ax_Eext,ax_Eint,ax_dst,ax_cpcp) =plt.subplots(4,1,figsize=[30,30],
                                                        sharex=True)
@@ -85,7 +92,8 @@ def plot_energy_flux(mp,sw,omni,log,path):
     ax_Eint.plot(closed.index,closed['K_netK7 [W]']/1e12,lw=3,
                          label='K7 (ClosedIB)',c='orange')
     # Sym-h and total energy content
-    ax_dst.fill_between(mp.index,mp['Utot [J]']/(1.5*-8e13),label='Utot',
+    U0 = mp['Utot [J]'].loc[mp.index[0]]
+    ax_dst.fill_between(mp.index,(mp['Utot [J]']-U0)/(1.5*-8e13),label='Utot',
                         fc='grey')
     ax_dst.plot(omni.index,omni['sym_h'],label='Sym-H',c='black',lw=3)
     ax_dst.plot(log.index,log['dst_sm'],label='Dst',c='purple',lw=1.5)
@@ -100,7 +108,7 @@ def plot_energy_flux(mp,sw,omni,log,path):
                           ylabel=r'Power $\left[TW\right]$',
                           timedelta=False)
     ax_Eext.legend(loc='lower right', bbox_to_anchor=(1.0, 1.05),
-                     ncol=3, fancybox=True, shadow=True)
+                     ncol=5, fancybox=True, shadow=True)
     general_plot_settings(ax_Eint,do_xlabel=False,legend=True,
                           xlim=window,
                           legend_loc='lower right',
@@ -122,6 +130,65 @@ def plot_energy_flux(mp,sw,omni,log,path):
     plt.close(eflux)
     print('\033[92m Created\033[00m',figurename)
 
+def plot_pc_size(dataset:dict,path:str) -> None:
+    #
+    I_swmf  = dataset['analysis']['currents']
+    I_ampere = dataset['ampere']
+    pc = dataset['obs2']['pc']
+
+    # Make plots for comparisons
+    pc_fig,(ax_lat,ax_area) =plt.subplots(2,1,figsize=[20,15],sharex=True)
+
+    # Lat points for noon/midnight in each hemisphere
+    ax_lat.plot(I_swmf.index,90-I_swmf['theta_day_N'],label='CMEE Noon',
+                c='gold')
+    ax_lat.plot(I_swmf.index,90-I_swmf['theta_night_N'],label='CMEE Midnight',
+                c='purple')
+    ax_lat.plot(I_swmf.index,I_swmf['theta_day_S']-90,label='_CMEE Noon',
+                c='gold',ls='--')
+    ax_lat.plot(I_swmf.index,I_swmf['theta_night_S']-90,
+                label='_CMEE Midnight',c='purple',ls='--')
+    # Lat points for noon/midnight of ocflb
+    ax_lat.plot(I_swmf.index,90-I_swmf['theta_noonN'],label='OCFLB Noon',
+                c='red')
+    ax_lat.plot(I_swmf.index,90-I_swmf['theta_midnightN'],
+                label='OCFLB Midnight',c='blue')
+    #ax_lat.plot(I_swmf.index,90-I_swmf['theta_minN'],label='_OCFLBmin',
+    #            c='lightgrey')
+    ax_lat.plot(I_swmf.index,I_swmf['theta_noonS']-90,label='_OCFLB Noon',
+                c='red',ls='--')
+    ax_lat.plot(I_swmf.index,I_swmf['theta_midnightS']-90,
+                label='_OCFLB Midnight',c='blue',ls='--')
+    #ax_lat2.plot(I_swmf.index,I_swmf['theta_minS']-90,label='_OCFLBmin',
+    #            c='lightgrey')
+
+    # Area of the polar cap according to different sources
+    ax_area.plot(I_swmf.index,I_swmf['Aoval_N'],label='CMEE Area',c='gold')
+    ax_area.plot(I_swmf.index,I_swmf['open_areaN'],label='OCFLB Area',c='red')
+    ax_area.plot(I_swmf.index,I_swmf['Aoval_S'],label='_CMEE Area',
+                  c='gold',ls='--')
+    ax_area.plot(I_swmf.index,I_swmf['open_areaS'],label='_OCFLB Area',
+                  c='red',ls='--')
+
+    # decorations
+    general_plot_settings(ax_lat,do_xlabel=False,legend=True,
+                          xlim=[TINIT,TEND],
+                          ylabel=r'Latitude $\left[^{\circ}\right]$',
+                          timedelta=False)
+    general_plot_settings(ax_area,do_xlabel=True,legend=True,
+                          xlim=[TINIT,TEND],
+                          ylabel=r'Area $\left[{R_e}^2\right]$',
+                          timedelta=False)
+
+    ax_lat.legend(loc='lower right', bbox_to_anchor=(1.0, 1.05),
+                    ncol=4, fancybox=True, shadow=True)
+
+    # save
+    pc_fig.tight_layout(pad=1)
+    figurename = f'{path}/polar_cap.png'
+    pc_fig.savefig(figurename)
+    plt.close(pc_fig)
+    print('\033[92m Created\033[00m',figurename)
 
 def plot_standoff(mp,sw,sw2,path):
     # Make plots for comparisons
@@ -299,9 +366,11 @@ def plot_saturation(mp_test,dataset,outPath):
     closed_test = dataset['analysis']['msdict']['closed']
     lobes_test = dataset['analysis']['msdict']['lobes']
     #K1   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']).resample('300s').mean()/-1e12
-    K1   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]'])/-1e12
+    #K1   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]'])/-1e12
+    K1   = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']
+                                                ).rolling('600s').mean()/-1e12
     K    = (mp_test['K_netK1 [W]']+mp_test['UtotM1 [W]']+
-           mp_test['K_netK5 [W]']+mp_test['UtotM5 [W]']+
+            mp_test['K_netK5 [W]']+mp_test['UtotM5 [W]']+
            closed_test['K_netK7 [W]']+lobes_test['K_netK3 [W]'])/-1e12
     U    = (mp_test['Utot [J]'])/1e15
     Ein  = pd.Series(index=K1.index,
@@ -310,6 +379,15 @@ def plot_saturation(mp_test,dataset,outPath):
     Esw  = pd.Series(index=K1.index,
                      data=np.interp(t_test,t_sw,
                                 dataset['obs2']['swmf_sw']['Esw'].values/1e3))
+    BOYLE = pd.Series(index=K1.index,
+                     data=np.interp(t_test,t_sw,
+                           dataset['obs2']['swmf_sw']['CPCP_B97'].values))
+    SHILL = pd.Series(index=K1.index,
+                     data=np.interp(t_test,t_sw,
+                           dataset['obs2']['swmf_sw']['CPCP_S02'].values))
+    KRID = pd.Series(index=K1.index,
+                     data=np.interp(t_test,t_sw,
+                           dataset['obs2']['swmf_sw']['CPCP_K08'].values))
     CPCP = pd.Series(index=K1.index,
                      data=np.interp(t_test,t_log,
                                  dataset['obs2']['swmf_log']['cpcpn'].values))
@@ -424,7 +502,9 @@ def plot_saturation(mp_test,dataset,outPath):
                         dataset[run]['obs']['swmf_sw']['Ma'].values)
         evCPCP  = np.interp(t_energy,t_log,
                         dataset[run]['obs']['swmf_log']['cpcpn'].values)
-        evK1    = (mp['K_netK1 [W]']+mp['UtotM1 [W]'])/-1e12
+        #evK1    = (mp['K_netK1 [W]']+mp['UtotM1 [W]'])/-1e12
+        evK1    = (mp['K_netK1 [W]']+mp['UtotM1 [W]']
+                                                ).rolling('600s').mean()/-1e12
         evK     = (mp['K_netK1 [W]']+mp['UtotM1 [W]']+
                    mp['K_netK5 [W]']+mp['UtotM5 [W]']-
                    closed['K_netK7 [W]']+lobes['K_netK3 [W]'])/-1e12
@@ -449,7 +529,7 @@ def plot_saturation(mp_test,dataset,outPath):
                                'K1':allK1,
                                'K':allK,
                                'FAC':allFAC})
-    from IPython import embed; embed()
+    df_reference = df_reference.dropna()
     # Obtain low,50, and high %tiles, and variance binned by our X axis
     Ein_bins  = np.linspace(1,24,11)
     Esw_bins  = np.linspace(df_reference['Esw'].quantile(0.005),
@@ -475,11 +555,11 @@ def plot_saturation(mp_test,dataset,outPath):
     Kdict     = bin_and_describe(df_reference['K'],df_reference['U'],
                                  df_reference,K_bins,0.05,0.95)
 
-    test_Ein_bins = np.linspace(Ein.quantile(0.005),Ein.quantile(0.995),11)
-    test_Esw_bins = np.linspace(Esw.quantile(0.005),Esw.quantile(0.995),11)
-    test_FAC_bins = np.linspace(FAC.quantile(0.005),FAC.quantile(0.995),11)
-    test_U_bins   = np.linspace(U.quantile(0.005),U.quantile(0.995),11)
-    test_K1_bins  = np.linspace(K1.quantile(0.005),K1.quantile(0.995),11)
+    test_Ein_bins = np.linspace(Ein.quantile(0.005),Ein.quantile(0.995),33)
+    test_Esw_bins = np.linspace(Esw.quantile(0.005),Esw.quantile(0.995),33)
+    test_FAC_bins = np.linspace(FAC.quantile(0.005),FAC.quantile(0.995),33)
+    test_U_bins   = np.linspace(U.quantile(0.005),U.quantile(0.995),33)
+    test_K1_bins  = np.linspace(K1.quantile(0.005),K1.quantile(0.995),33)
     test_Satdict  = bin_and_describe(Ein,CPCP,CPCP,test_Ein_bins,0.05,0.95)
     test_Satdict2 = bin_and_describe(Esw,CPCP,CPCP,test_Esw_bins,0.05,0.95)
     test_Satdict3 = bin_and_describe(Ein,FAC,FAC,test_Ein_bins,0.05,0.95)
@@ -495,6 +575,8 @@ def plot_saturation(mp_test,dataset,outPath):
     fig5, ax5 = plt.subplots(figsize=[18,15])
     fig6, ax6 = plt.subplots(figsize=[18,15])
     fig7, [ax7_top,ax7_bot] = plt.subplots(2,1,figsize=[20,15],sharex=True)
+    #fig8, [[axa,axb],[axc,axd],[axe,axf]] =plt.subplots(3,2)
+    fig8, axa = plt.subplots()
     # Draw on Plots
 
     # Ax1
@@ -565,6 +647,31 @@ def plot_saturation(mp_test,dataset,outPath):
     cbar5 = fig5.colorbar(sc5)
     ax5.scatter(df_reference['K1'],df_reference['FAC'],
                 s=25,marker='x',c='grey',alpha=0.2)
+    model = sm.OLS(FAC.values,K1.values)
+    results = model.fit()
+    print(results.summary())
+    names = ['Boyle1997','Sisco-Hill2002','Kivelson-Ridley2008']
+    for i,predictor in enumerate([BOYLE,SHILL,KRID]):
+        axa.scatter(Esw,predictor-CPCP,s=50,alpha=0.8,label=names[i])
+    axa.set_xlabel(r'$E_{K-L}\left[mA/m\right]$')
+    axa.set_ylabel(r'CPCP $\left[kV\right]$')
+    axa.legend()
+    #TODO
+    #   Try out functional forms of Hill-Siscoe, Kivelson-Ridley, etc.
+    #   Try out X^... [0.01, 0.05, 0.1, 0.15, 0.3, 0.5, 0.75, 1]
+    #
+    #   Tabulate (R^2, thumbnail of residuals) for K1->FAC & Ein->CPCP
+    from IPython import embed; embed()
+    slope,inter,r,p,std_err=scipy.stats.linregress(K1.values,FAC.values)
+    ax5.plot(test_K1_bins,slope*test_K1_bins+inter,c='blue',ls='--',lw=3)
+    ax5.text(0.02,0.84,r'$R^2$'+f'={r**2:.2f}',transform=ax5.transAxes,
+                                   c='blue',horizontalalignment='left')
+
+    slope,inter,r,p,std_err=scipy.stats.linregress(df_reference['K1'].values,
+                                                   df_reference['FAC'].values)
+    ax5.plot(K1_bins,slope*K1_bins+inter,c='red',ls='--',lw=3)
+    ax5.text(0.02,0.94,r'$R^2$'+f'={r**2:.2f}',transform=ax5.transAxes,
+                                   c='red',horizontalalignment='left')
 
     # Ax6
     extended_fill_between(ax6,test_FAC_bins,test_Satdict4['pLow_all'],
@@ -710,9 +817,12 @@ if __name__ == "__main__":
     dataset['obs2'] = read_indices(inLogs,start=TINIT,
                                   end=TIMPACT+dt.timedelta(hours=24),
                                   read_supermag=False)
+    dataset['obs2']['pc'] =read_pc(f"{inBase}data/pc_index/pcnpcs4318007.txt")
+
     sw2 = dataset['obs2']['swmf_sw']
     log2 = dataset['obs2']['swmf_log']
     omni = dataset['obs2']['omni']
+    pc = dataset['obs2']['pc']
     ## Analysis Data
     dataset['analysis'] = load_hdf_sort(inAnalysis+'energetics.h5')
     with pd.HDFStore(inAnalysis+'integrated_currents.h5') as store:
@@ -787,13 +897,16 @@ if __name__ == "__main__":
 
     # Plot index results
     #plot_indices(sw,log,omni,outPath)
-    #plot_indices(sw2,log2,omni,outPath+'/unfiled/')
+    #plot_indices(sw2,log2,omni,pc,outPath+'/unfiled/')
 
     # Plot standoff distance
     #plot_standoff(mp,sw,sw2,outPath)
 
+    # Plot polar cap area
+    #plot_pc_size(dataset,outPath+'/unfiled/')
+
     # Plot energy flux
-    #plot_energy_flux(mp,sw2,omni,log2,outPath)
+    #plot_energy_flux(mp,sw2,omni,log2,outPath+'/unfiled/')
 
     # Plot sat data
     #plot_satellites(themisA,themisD,themisE,
@@ -801,7 +914,7 @@ if __name__ == "__main__":
     #                outPath)
 
     # Investigate energy input for saturation
-    #plot_saturation(mp,dataset,outPath)
+    plot_saturation(mp,dataset,outPath)
 
     # Compare with data
-    plot_data_compare(dataset,outPath)
+    #plot_data_compare(dataset,outPath)
