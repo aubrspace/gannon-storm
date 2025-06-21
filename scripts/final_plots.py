@@ -1064,8 +1064,14 @@ def main() -> None:
     swmf_log = dataset['obs']['swmf_log']
     omni = dataset['obs']['omni']
     pc = dataset['obs']['pc']
-    magfile = "../data/large/GM/IO2/magnetometers_e20240510-130000.mag"
-    vmagnets = loadmagnetometers(magfile)
+    #magfile = "../data/large/GM/IO2/magnetometers_e20240510-130000.mag"
+    #vmagnets = loadmagnetometers(magfile)
+    magfile = "../data/logs/magnetometers_e20240510-130000.npz"
+    mag = np.load(magfile,allow_pickle=True)
+    vmagnets = pd.DataFrame(dict(mag))
+    vmagnets.index = vmagnets['time']
+    vmagnets.drop(columns='time',inplace=True)
+
 
     ## Analysis Data
     dataset['analysis'] = load_hdf_sort(inAnalysis+'energetics.h5')
