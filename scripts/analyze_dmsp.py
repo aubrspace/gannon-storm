@@ -12,11 +12,11 @@ from global_energetics.analysis.plot_tools import (pyplotsetup,
                                                    general_plot_settings)
 
 def draw_dmsp_north_tseries(axis:plt.Axes,dmsp:dict,**kwargs:dict) -> None:
-    axis.plot(dmsp['F16_N']['time'],dmsp['F16_N']['cpcp_kV'],label='F16_N',
+    axis.plot(dmsp['F16_N']['time'],dmsp['F16_N']['cpcp_kV'],label='dmspF16',
               color='red')
-    axis.plot(dmsp['F17_N']['time'],dmsp['F17_N']['cpcp_kV'],label='F17_N',
+    axis.plot(dmsp['F17_N']['time'],dmsp['F17_N']['cpcp_kV'],label='dmspF17',
               color='blue')
-    axis.plot(dmsp['F18_N']['time'],dmsp['F18_N']['cpcp_kV'],label='F18_N',
+    axis.plot(dmsp['F18_N']['time'],dmsp['F18_N']['cpcp_kV'],label='dmspF18',
               color='black')
     axis.scatter(dmsp['F16_N']['time'],dmsp['F16_N']['cpcp_kV'],label='_F16_N',
               color='red',s=150,marker='X')
@@ -27,11 +27,11 @@ def draw_dmsp_north_tseries(axis:plt.Axes,dmsp:dict,**kwargs:dict) -> None:
     return
 
 def draw_dmsp_south_tseries(axis:plt.Axes,dmsp:dict,**kwargs:dict) -> None:
-    axis.plot(dmsp['F16_S']['time'],dmsp['F16_S']['cpcp_kV'],label='F16_N',
+    axis.plot(dmsp['F16_S']['time'],dmsp['F16_S']['cpcp_kV'],label='dmspF16',
               color='red')
-    axis.plot(dmsp['F17_S']['time'],dmsp['F17_S']['cpcp_kV'],label='F17_N',
+    axis.plot(dmsp['F17_S']['time'],dmsp['F17_S']['cpcp_kV'],label='dmspF17',
               color='blue')
-    axis.plot(dmsp['F18_S']['time'],dmsp['F18_S']['cpcp_kV'],label='F18_N',
+    axis.plot(dmsp['F18_S']['time'],dmsp['F18_S']['cpcp_kV'],label='dmspF18',
               color='black')
     axis.scatter(dmsp['F16_S']['time'],dmsp['F16_S']['cpcp_kV'],label='_F16_S',
               color='red',s=150,marker='X')
@@ -43,54 +43,58 @@ def draw_dmsp_south_tseries(axis:plt.Axes,dmsp:dict,**kwargs:dict) -> None:
 
 def draw_swmf_north_tseries(axis:plt.Axes,dmsp:dict,swmf:dict) -> None:
     cpcp = [p.max()-p.min() for p in swmf['PHI [kV]']]
-    axis.plot(swmf['time'],cpcp,label='swmf_whole',c='grey')
+    axis.fill_between(swmf['time'],cpcp,label='swmf_whole',fc='lightgrey')
     axis.plot(dmsp['F16_N']['time'],dmsp['F16_N']['ie_cpcp'],
-                 label='_swmfF16',color='red',ls='--')
+                 label='swmfF16',color='orange',ls='--')
     axis.plot(dmsp['F17_N']['time'],dmsp['F17_N']['ie_cpcp'],
-                 label='_swmfF17',color='blue',ls='--')
+                 label='swmfF17',color='purple',ls='--')
     axis.plot(dmsp['F18_N']['time'],dmsp['F18_N']['ie_cpcp'],
-                 label='_swmfF18',color='black',ls='--')
+                 label='swmfF18',color='dimgrey',ls='--')
     axis.scatter(dmsp['F16_N']['time'],dmsp['F16_N']['ie_cpcp'],
-                 label='_swmfF16',color='red',s=150,marker='o')
+                 label='_swmfF16',color='orange',s=150,marker='o')
     axis.scatter(dmsp['F17_N']['time'],dmsp['F17_N']['ie_cpcp'],
-                 label='_swmfF17',color='blue',s=150,marker='o')
+                 label='_swmfF17',color='purple',s=150,marker='o')
     axis.scatter(dmsp['F18_N']['time'],dmsp['F18_N']['ie_cpcp'],
-                 label='_swmfF18',color='black',s=150,marker='o')
+                 label='_swmfF18',color='dimgrey',s=150,marker='o')
     return
 
 def draw_swmf_south_tseries(axis:plt.Axes,dmsp:dict,swmf:dict) -> None:
     cpcp = [p.max()-p.min() for p in swmf['PHI [kV]']]
-    axis.plot(swmf['time'],cpcp,label='swmf_whole',c='grey')
+    axis.fill_between(swmf['time'],cpcp,label='swmf_whole',fc='lightgrey')
     axis.plot(dmsp['F16_S']['time'],dmsp['F16_S']['ie_cpcp'],
-                 label='_swmfF16',color='red',ls='--')
+                 label='swmfF16',color='orange',ls='--')
     axis.plot(dmsp['F17_S']['time'],dmsp['F17_S']['ie_cpcp'],
-                 label='_swmfF17',color='blue',ls='--')
+                 label='swmfF17',color='purple',ls='--')
     axis.plot(dmsp['F18_S']['time'],dmsp['F18_S']['ie_cpcp'],
-                 label='_swmfF18',color='black',ls='--')
+                 label='swmfF18',color='dimgrey',ls='--')
     axis.scatter(dmsp['F16_S']['time'],dmsp['F16_S']['ie_cpcp'],
-                 label='_swmfF16',color='red',s=150,marker='o')
+                 label='_swmfF16',color='orange',s=150,marker='o')
     axis.scatter(dmsp['F17_S']['time'],dmsp['F17_S']['ie_cpcp'],
-                 label='_swmfF17',color='blue',s=150,marker='o')
+                 label='_swmfF17',color='purple',s=150,marker='o')
     axis.scatter(dmsp['F18_S']['time'],dmsp['F18_S']['ie_cpcp'],
-                 label='_swmfF18',color='black',s=150,marker='o')
+                 label='_swmfF18',color='dimgrey',s=150,marker='o')
     return
 
 def plot_timeseries(ie:dict,dmsp:dict,path:str) -> None:
     # Figure
     fig,[ax1,ax2] = plt.subplots(2,1,figsize=[24,24],sharex=True)
     # Plot
-    draw_dmsp_north_tseries(ax1,dmsp)
-    draw_dmsp_south_tseries(ax2,dmsp)
     draw_swmf_north_tseries(ax1,dmsp,ie['N'])
     draw_swmf_south_tseries(ax2,dmsp,ie['S'])
+    draw_dmsp_north_tseries(ax1,dmsp)
+    draw_dmsp_south_tseries(ax2,dmsp)
     # Decorate
     for i,axis in enumerate([ax1,ax2]):
         general_plot_settings(axis,do_xlabel=i==1,legend=False,timedelta=False,
                               ylabel=r'CPCP $\left[kV\right]$',
-                              xlim=[dmsp['F16_N']['time'][0],
-                                    dmsp['F16_N']['time'][-1]])
+                              xlim=[ie['N']['time'][0],
+                                    ie['N']['time'][-1]])
     ax1.legend(loc='lower right', bbox_to_anchor=(1.0, 1.05),
-                ncol=6, fancybox=True, shadow=True)
+                ncol=4, fancybox=True, shadow=True)
+    ax1.text(0.9,0.9,"North",transform=ax1.transAxes,fontsize=36,
+             horizontalalignment='right')
+    ax2.text(0.9,0.9,"South",transform=ax2.transAxes,fontsize=36,
+             horizontalalignment='right')
     fig.tight_layout()
     # Save
     figurename = f"{path}/tseries_all.png"
@@ -228,7 +232,7 @@ def main() -> None:
         print(f'\033[92m Created\033[00m "../data/dmsp/compiled_{sat}.npz"')
 
     #plot_iono_projection(ie,dmsp,"../outputs/dmsp")
-    plot_timeseries(ie,dmsp,"../outputs/figures/dmsp")
+    #plot_timeseries(ie,dmsp,"../outputs/figures/dmsp")
 
     # For each satellite
     #   Plot just the crossings in N hemi SM coordinated w/ Ex color

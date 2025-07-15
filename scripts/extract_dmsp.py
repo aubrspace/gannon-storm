@@ -80,6 +80,12 @@ def read_all_ie(inpath:str) -> dict[dict[str:np.ndarray]]:
         results_S[i] = result['IonS']
     ie['N'] = combine_ie(results_N)
     ie['S'] = combine_ie(results_S)
+    # Sort in time
+    order_N = ie['N']['time'].argsort()
+    order_S = ie['S']['time'].argsort()
+    for key in ie['N']:
+        ie['N'][key] = ie['N'][key][order_N]
+        ie['S'][key] = ie['S'][key][order_N]
     return ie
 
 #############################################################################

@@ -1037,7 +1037,7 @@ def plot_figure_4_old(path:str,solarwind:pd.DataFrame,
 
 def main() -> None:
     ## Global variables and file paths
-    global TINIT,TEND,TCUT,TMIN,sm
+    global TINIT,TEND,TCUT,TMIN
     TINIT = dt.datetime(2024,5,10,13,0)
     TIMPACT = dt.datetime(2024,5,10,17)
     TCUT = dt.datetime(2024,5,11,10,0)
