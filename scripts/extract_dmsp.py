@@ -58,8 +58,8 @@ def load_ie(infile:str) -> dict[str:np.ndarray]:
                     raw1 = f.readline()
                     raw2 = f.readline()
                     rawdata = np.concat([raw1.split(),raw2.split()])
-                    for i,variable in enumerate(variables):
-                        data[zone][variable][i] = float(rawdata[i])
+                    for j,variable in enumerate(variables):
+                        data[zone][variable][i] = float(rawdata[j])
     # take some helpful aux data from the title line earlier
     time_str, btilt_str = np.array(titleline.split())[[4,6]] #NOTE fragile
     for zone in data:
