@@ -57,10 +57,12 @@ def run_swipe(solarwind:pd.DataFrame,path:str) -> None:
     velocity = solarwind['v'].values
     By = solarwind['by'].values
     Bz = solarwind['bz'].values
-    Btilt = solarwind['btilt'].values
+    Btilt = solarwind['btilt'].values * -1
     f107 = solarwind['f107'].values
     cpcp_n = np.zeros(len(f107))
     cpcp_s = np.zeros(len(f107))
+    times = np.array([dt.datetime.strptime(str(t),"%Y-%m-%d %H:%M:%S")
+                                                    for t in solarwind.index])
     print("Running SWIPE ...")
     for im in tqdm(range(0,len(velocity))):
         model = SWIPE(velocity[im],By[im],Bz[im],Btilt[im],f107[im])
@@ -81,9 +83,9 @@ def run_swipe(solarwind:pd.DataFrame,path:str) -> None:
         cpcp_s[im] = pot[10000::].max()-pot[10000::].min()
         # Make a plot
         #TODO
-    np.savez_compressed(f"{path}/swipe_cpcp.npz",{'time':solarwind.index,
-                                                  'cpcp_n':cpcp_n,
-                                                  'cpcp_s':cpcp_s})
+    result = {'time':times,'cpcp_n':cpcp_n,'cpcp_s':cpcp_s}
+    np.savez_compressed(f"{path}/swipe_cpcp.npz",**result)
+    print(f'\033[92m Created\033[00m {path}/swipe_cpcp.npz')
 
 def main() -> None:
     inLogs = "../data/logs/"

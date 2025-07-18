@@ -11,6 +11,14 @@ from tqdm import tqdm
 from global_energetics.analysis.plot_tools import (pyplotsetup,
                                                    general_plot_settings)
 
+def draw_swipe_north_tseries(axis:plt.Axes,swipe:dict,**kwargs:dict) -> None:
+    axis.plot(swipe['time'],swipe['cpcp_n'],label='SWIPE',color='magenta')
+    return
+
+def draw_swipe_south_tseries(axis:plt.Axes,swipe:dict,**kwargs:dict) -> None:
+    axis.plot(swipe['time'],swipe['cpcp_s'],label='SWIPE',color='magenta')
+    return
+
 def draw_dmsp_north_tseries(axis:plt.Axes,dmsp:dict,**kwargs:dict) -> None:
     axis.plot(dmsp['F16_N']['time'],dmsp['F16_N']['cpcp_kV'],label='dmspF16',
               color='red')
@@ -75,7 +83,7 @@ def draw_swmf_south_tseries(axis:plt.Axes,dmsp:dict,swmf:dict) -> None:
                  label='_swmfF18',color='dimgrey',s=150,marker='o')
     return
 
-def plot_timeseries(ie:dict,dmsp:dict,path:str) -> None:
+def plot_timeseries(ie:dict,dmsp:dict,swipe:dict,path:str) -> None:
     # Figure
     fig,[ax1,ax2] = plt.subplots(2,1,figsize=[24,24],sharex=True)
     # Plot
@@ -83,6 +91,8 @@ def plot_timeseries(ie:dict,dmsp:dict,path:str) -> None:
     draw_swmf_south_tseries(ax2,dmsp,ie['S'])
     draw_dmsp_north_tseries(ax1,dmsp)
     draw_dmsp_south_tseries(ax2,dmsp)
+    draw_swipe_north_tseries(ax1,swipe)
+    draw_swipe_south_tseries(ax2,swipe)
     # Decorate
     for i,axis in enumerate([ax1,ax2]):
         general_plot_settings(axis,do_xlabel=i==1,legend=False,timedelta=False,
@@ -206,6 +216,8 @@ def main() -> None:
     dmsp['F18_S'] = dict(np.load("../data/dmsp/compiled_F18_S.npz",
                            allow_pickle=True))
 
+    swipe = dict(np.load("../data/swipe/swipe_cpcp.npz",allow_pickle=True))
+
     #for sat in dmsp:
     if False:
         # Initialize arrays inside dmsp dict to hold the extraction result
@@ -232,7 +244,7 @@ def main() -> None:
         print(f'\033[92m Created\033[00m "../data/dmsp/compiled_{sat}.npz"')
 
     #plot_iono_projection(ie,dmsp,"../outputs/dmsp")
-    #plot_timeseries(ie,dmsp,"../outputs/figures/dmsp")
+    plot_timeseries(ie,dmsp,swipe,"../outputs/figures/dmsp")
 
     # For each satellite
     #   Plot just the crossings in N hemi SM coordinated w/ Ex color
