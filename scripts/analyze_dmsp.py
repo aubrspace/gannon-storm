@@ -129,7 +129,35 @@ def plot_iono_projection(ie:dict,dmsp:dict,path:str) -> None:
     #cb.set_label(r"CPCP $\left[kV\right]$",fontsize=36)
     plt.show()
 ##############################################################################
+def plot_jpar_dist(ie:dict,outpath:str) -> None:
+    for it in range(0,1681):
+        jr = ie['N']["JR [`mA/m^2]"][it,:]
+        area = ie['N']["Area [Re^2]"][it,:][jr>0]
+        hist,edge = np.histogram(jr[jr>0],bins=50,weights=area,density=True)
+        bins = np.array([(edge[i]+edge[i+1])/2 for i in range(0,50)])
+        p0 = np.trapezoid(hist[bins<=0.5],x=bins[bins<=0.5])
+        p1 = np.trapezoid(hist[bins>0.5],x=bins[bins>0.5])
 
+        fig,ax = plt.subplots(1,1,figsize=[12,10])
+        ax.plot(bins,hist,c='black')
+        ax.fill_between(bins[bins<=0.5],hist[bins<=0.5],fc='blue',alpha=0.5)
+        ax.fill_between(bins[bins>0.5],hist[bins>0.5],fc='red',alpha=0.5)
+        ax.set_xlim([bins[0],bins[-1]])
+        ax.set_ylim([0,hist.max()*1.01])
+        ax.set_xlabel(r'$J_R \left[\mu A/m^2\right]$')
+        ax.set_ylabel('PDF')
+        ax.axvline(0.5,lw=3,c='red')
+        ax.text(0,1,f"{ie['N']['time'][it]}",transform=ax.transAxes,
+                fontsize=20,horizontalalignment='left')
+        ax.text(0,0.95,f"{p0:.2f}",transform=ax.transAxes,
+                fontsize=20,c='magenta',horizontalalignment='left')
+        ax.text(0.99,0.95,f"{p1:.2f}",transform=ax.transAxes,
+                fontsize=20,c='red',horizontalalignment='right')
+        fig.tight_layout()
+        plt.savefig(f"{outpath}/jr/jr_{it:04d}.png")
+        plt.close(fig)
+        print(f"\033[92m Created\033[00m {outpath}/jr_{it}.png")
+##############################################################################
 @jit(nopython=True, parallel=True)
 def dumb_2D_interp(x:np.ndarray,y:np.ndarray,z:np.ndarray,
            target_xs:np.ndarray,target_ys:np.ndarray,
@@ -201,6 +229,8 @@ def main() -> None:
                            allow_pickle=True))
     ie['S'] = dict(np.load("../data/large/IE/ionosphere/compiled_S.npz",
                            allow_pickle=True))
+    plot_jpar_dist(ie,"../outputs/figures")
+    '''
 
     dmsp = {}
     dmsp['F16_N'] = dict(np.load("../data/dmsp/compiled_F16_N.npz",
@@ -253,6 +283,7 @@ def main() -> None:
     #       extract IE along the crossing
     #       integrate E along each crossing
     #       adjustment for altitude???
+    '''
     return
 
 if __name__ == "__main__":

@@ -1119,9 +1119,10 @@ def main() -> None:
     dataset['ampere'] = all_data
     I_ampere = dataset['ampere']
 
+    from IPython import embed; embed()
     ## Create Figures
     #plot_figure_1(unfiled,solarwind,swmf_log,mp,omni)
-    plot_figure_2(unfiled,sats,vsats,vmagnets,I_ampere,I_swmf,pc,swmf_log)
+    #plot_figure_2(unfiled,sats,vsats,vmagnets,I_ampere,I_swmf,pc,swmf_log)
     #plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     #plot_figure_4(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
 
