@@ -421,171 +421,6 @@ def draw_model_resid_panel(ax:plt.Axes,
     ax.axhline(0,c='grey')
     return ax, sc
 
-'''
-def plot_figure_3_old(path:str,solarwind:pd.DataFrame,
-                                  mp:pd.DataFrame,
-                              I_swmf:pd.DataFrame,
-                            I_ampere:pd.DataFrame,
-                            swmf_log:pd.DataFrame,**kwargs:dict) -> plt.Axes:
-    # Get data to a common time axis
-    t_sw = [float(t.to_numpy()) for t in solarwind.index-TMIN]
-    t_mp = [float(t.to_numpy()) for t in mp.index-TMIN]
-    t_log = [float(t.to_numpy()) for t in swmf_log.index-TMIN]
-    t_ie   = [float(t.to_numpy()) for t in I_swmf.index-TMIN]
-    t_ampere = [float(t.to_numpy()) for t in I_ampere.index-TMIN]
-    K1  = (mp['K_netK1 [W]']+mp['UtotM1 [W]']).rolling('600s').mean()/-1e12
-    Ein = pd.Series(index=K1.index,
-                   data=np.interp(t_mp,t_sw,solarwind['EinWang'].values/1e12))
-    Esw = pd.Series(index=K1.index,
-                     data=np.interp(t_mp,t_sw,solarwind['Esw'].values/1e3))
-    CPCP= pd.Series(index=K1.index,
-                     data=np.interp(t_mp,t_log,swmf_log['cpcpn'].values))
-    FAC  = pd.Series(index=K1.index,data=np.interp(t_mp,t_ie,
-                      (I_swmf['up_north_MA']).values))
-    AMP_FAC = pd.Series(index=K1.index,data=np.interp(t_mp,t_ampere,
-                                    I_ampere['I_total_up_North_[MA]'].values))
-    pdyn = np.interp(t_mp,t_sw,solarwind['pdyn'].values)
-
-    BOYLE   = pd.Series(index=K1.index,
-                       data=np.interp(t_mp,t_sw,solarwind['CPCP_B97'].values))
-    SHILL   = pd.Series(index=K1.index,
-                       data=np.interp(t_mp,t_sw,solarwind['CPCP_S02'].values))
-    KRID    = pd.Series(index=K1.index,
-                       data=np.interp(t_mp,t_sw,solarwind['CPCP_K08'].values))
-
-    # Create some models for how the K1 FAC relationship could be fit
-    x = K1[K1>0].values
-    x_sort = x.argsort()
-    x = x[x_sort]
-    X_linear = np.column_stack((x,np.ones(len(x))))
-    X_sq = np.column_stack((x,x**(1/2),np.ones(len(x))))
-    X_cu = np.column_stack((x,x**(1/3),np.ones(len(x))))
-    y = FAC[K1>0].iloc[x_sort]
-
-    model_linear = sm.OLS(y,X_linear)
-    model_sq = sm.OLS(y,X_sq)
-    model_cu = sm.OLS(y,X_cu)
-
-    result_linear = model_linear.fit()
-    result_sq     = model_sq.fit()
-    result_cu     = model_cu.fit()
-
-    # For Ein predict CPCP
-    x2      = Ein.values
-    x2_sort = x2.argsort()
-    x2      = x2[x2_sort]
-    X2_sq   = np.column_stack((x2,x2**(1/2),np.ones(len(x2))))
-    y2      = CPCP.iloc[x2_sort]
-
-    model2_sq  = sm.OLS(y2,X2_sq)
-    result2_sq = model2_sq.fit()
-
-    # For Esw predict CPCP
-    x3      = Esw.values
-    x3_sort = x3.argsort()
-    x3      = x3[x3_sort]
-    X3      = np.column_stack((x2,x2**(1/2),np.ones(len(x2))))
-    y3      = CPCP.iloc[x3_sort]
-
-    model3  = sm.OLS(y3,X3)
-    result3 = model3.fit()
-
-
-    # Figure
-    fig = plt.figure(figsize=[32,30])
-    # GridSpecs
-    sliver = plt.GridSpec(1,2,hspace=0.1,figure=fig,
-                             left=0.06,right=0.92,bottom=0.04,top=0.98,
-                             width_ratios=[56,1],wspace=0.1)
-    mainsplit = sliver[0].subgridspec(1,2,width_ratios=[1.7,6.3],wspace=0.15)
-    fourstack = mainsplit[0].subgridspec(4,1,hspace=0.22)
-    sixpack = mainsplit[1].subgridspec(3,2,hspace=0.17,wspace=0.1)
-
-    # Declare axes
-    fit_ax1 = fig.add_subplot(fourstack[0])
-    fit_ax2 = fig.add_subplot(fourstack[1])
-    fit_ax3 = fig.add_subplot(fourstack[2])
-    fit_ax4 = fig.add_subplot(fourstack[3])
-
-    model_ax1 = fig.add_subplot(sixpack[0,0])
-    model_ax2 = fig.add_subplot(sixpack[0,1])
-    model_ax3 = fig.add_subplot(sixpack[1,0])
-    model_ax4 = fig.add_subplot(sixpack[1,1])
-    model_ax5 = fig.add_subplot(sixpack[2,0])
-    model_ax6 = fig.add_subplot(sixpack[2,1])
-
-    # Plot
-    fit_ax1,sc = draw_scatter_panel(fit_ax1,Esw,K1,pdyn,text_loc='right')
-    fit_ax2,sc = draw_scatter_panel(fit_ax2,K1[K1>0],FAC[K1>0],pdyn[K1>0])
-    fit_ax3,sc = draw_scatter_panel(fit_ax3,FAC,CPCP,pdyn)
-    fit_ax4,sc = draw_scatter_panel(fit_ax4,Ein,CPCP,pdyn)
-
-    model_ax1,sc = draw_scatter_panel(model_ax1,BOYLE,CPCP,pdyn,
-                                      text_loc='right')
-    model_ax3,sc = draw_scatter_panel(model_ax3,SHILL,CPCP,pdyn)
-    model_ax5,sc = draw_scatter_panel(model_ax5,KRID,CPCP,pdyn,
-                                      text_loc='right')
-
-    model_ax2,sc = draw_scatter_panel(model_ax2,Esw,CPCP,pdyn,
-                                      text_loc='right')
-    model_ax4,sc = draw_scatter_panel(model_ax4,K1[K1>0]**0.5,CPCP[K1>0],
-                                      pdyn[K1>0])
-    model_ax6,sc = draw_scatter_panel(model_ax6,AMP_FAC,CPCP,pdyn)
-    # Decorate
-    cb_ax = fig.add_axes([0.92,.084,.02,.854])
-    #cb_ax = fig.add_axes([0.88,.124,.04,.754])
-    cb    = fig.colorbar(sc,orientation='vertical',cax=cb_ax)
-    cb.set_label(r"$p_{dyn}\left[nPa\right]$",fontsize=36)
-    fit_ax1.set_xlabel(r"$E_{in}\left[TW\right]$ Wang'14")
-    fit_ax1.set_ylabel(K1label())
-
-    fit_ax2.set_xlabel(K1label())
-    fit_ax2.set_ylabel(r'$\int$FAC $\left[MA\right]$')
-    fit_ax2.plot(x,result_sq.fittedvalues,c='red',ls='--')
-    fit_ax2.text(0.02,0.88,r'$R^2$'+f'={result_sq.rsquared:.2f}',
-             transform=fit_ax2.transAxes,c='red',horizontalalignment='left')
-
-    fit_ax3.set_xlabel(r'$\int$FAC $\left[MA\right]$')
-    fit_ax3.set_ylabel(r'CPCP $\left[kV\right]$')
-
-    fit_ax4.set_xlabel(r"$E_{in}\left[TW\right]$ Wang'14")
-    fit_ax4.set_ylabel(r'CPCP $\left[kV\right]$')
-    fit_ax4.plot(x2,result2_sq.fittedvalues,c='red',ls='--')
-    fit_ax4.text(0.02,0.88,r'$R^2$'+f'={result2_sq.rsquared:.2f}',
-             transform=fit_ax4.transAxes,c='red',horizontalalignment='left')
-
-    model_ax1.set_xlabel(r"Boyle'97 CPCP $\left[kV\right]$")
-    model_ax3.set_xlabel(r"Siscoe-Hill'02 CPCP $\left[kV\right]$")
-    model_ax5.set_xlabel(r"Kivelson-Ridley'08 CPCP $\left[kV\right]$")
-
-    model_ax2.set_xlabel(r'$E_{KL}\left[mA/m\right]$')
-    model_ax2.plot(x3,result3.fittedvalues,c='red',ls='--')
-    model_ax2.text(0.98,0.88,r'$R^2$'+f'={result3.rsquared:.2f}',
-             transform=model_ax2.transAxes,c='red',horizontalalignment='right')
-    model_ax4.set_xlabel(
-                    r"$\sqrt{\overline{\int_O{\mathbf{K}\cdot\mathbf{n}}}}$")
-    model_ax6.set_xlabel(r'AMPERE $\int$FAC $\left[MA\right]$')
-
-
-    for i,ax in enumerate([model_ax1,model_ax2,model_ax3,
-                           model_ax4,model_ax5,model_ax6]):
-        ax.margins(x=0.01,y=0.01)
-        ax.set_ylabel(r'CPCP $\left[kV\right]$')
-        if i==1 or i==3 or i==5:
-            ax.yaxis.tick_right()
-            ax.yaxis.set_label_position("right")
-    fig.patches.extend([plt.Rectangle([0,0.25],0.23,1,fill=True,fc='plum',
-                   alpha=0.2,zorder=-1,transform=fig.transFigure,figure=fig)])
-    fig.patches.extend([plt.Rectangle([0,0],0.23,0.25,fill=True,fc='grey',
-                   alpha=0.5,zorder=-1,transform=fig.transFigure,figure=fig)])
-
-    # Save
-    figurename = f"{path}/figure3.png"
-    fig.savefig(figurename)
-    plt.close(fig)
-    print('\033[92m Created\033[00m',figurename)
-'''
-
 def plot_figure_3(path:str,solarwind:pd.DataFrame,
                                   mp:pd.DataFrame,
                               I_swmf:pd.DataFrame,
@@ -617,7 +452,34 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
                        data=np.interp(t_mp,t_sw,solarwind['CPCP_S02'].values))
     KRID    = pd.Series(index=K1.index,
                        data=np.interp(t_mp,t_sw,solarwind['CPCP_K08'].values))
-    #from IPython import embed; embed()
+
+    tpre   = FAC.index<TMAIN
+    tstorm = FAC.index>TMAIN
+
+    K1storm = K1[tstorm]
+    Einstorm = Ein[tstorm]
+    Eswstorm = Esw[tstorm]
+    CPCPstorm = CPCP[tstorm]
+    FACstorm = FAC[tstorm]
+    AMP_FACstorm = AMP_FAC[tstorm]
+    pdynstorm = pdyn[tstorm]
+    timesstorm = times[tstorm]
+    BOYLEstorm = BOYLE[tstorm]
+    SHILLstorm = SHILL[tstorm]
+    KRIDstorm = KRID[tstorm]
+
+    K1pre = K1[tpre]
+    Einpre = Ein[tpre]
+    Eswpre = Esw[tpre]
+    CPCPpre = CPCP[tpre]
+    FACpre = FAC[tpre]
+    AMP_FACpre = AMP_FAC[tpre]
+    pdynpre = pdyn[tpre]
+    timespre = times[tpre]
+    BOYLEpre = BOYLE[tpre]
+    SHILLpre = SHILL[tpre]
+    KRIDpre = KRID[tpre]
+
 
     # Create some models for how the K1 FAC relationship could be fit
     x = K1[K1>0].values
@@ -716,7 +578,8 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
             ax.yaxis.tick_right()
             ax.yaxis.set_label_position("right")
             if i!=1:
-                ax.set_ylim([-1,8])
+                #ax.set_ylim([-1,8])
+                ax.set_ylim([-1,1])
             else:
                 ax.axhline(-1,c='grey',ls='--')
                 ax.axhline(8,c='grey',ls='--')
@@ -915,131 +778,14 @@ def plot_figure_4(path:str,solarwind:pd.DataFrame,
     plt.close(fig)
     print('\033[92m Created\033[00m',figurename)
 
-
-'''
-def plot_figure_4_old(path:str,solarwind:pd.DataFrame,
-                                  mp:pd.DataFrame,
-                              I_swmf:pd.DataFrame,
-                            I_ampere:pd.DataFrame,
-                            swmf_log:pd.DataFrame,**kwargs:dict) -> plt.Axes:
-    # Get data to a common time axis
-    t_sw = [float(t.to_numpy()) for t in solarwind.index-TMIN]
-    t_mp = [float(t.to_numpy()) for t in mp.index-TMIN]
-    t_log = [float(t.to_numpy()) for t in swmf_log.index-TMIN]
-    t_ie   = [float(t.to_numpy()) for t in I_swmf.index-TMIN]
-    t_ampere = [float(t.to_numpy()) for t in I_ampere.index-TMIN]
-    K1  = ((mp['K_netK1 [W]']+mp['UtotM1 [W]']).rolling('600s'
-                                                       ).mean()/-1e12).values
-    Ein     = np.interp(t_mp,t_sw,solarwind['EinWang'].values/1e12)
-    Esw     = np.interp(t_mp,t_sw,solarwind['Esw'].values/1e3)
-    CPCP    = np.interp(t_mp,t_log,swmf_log['cpcpn'].values)
-    FAC     = np.interp(t_mp,t_ie,(I_swmf['up_north_MA']).values)
-    AMP_FAC = np.interp(t_mp,t_ampere,I_ampere['I_total_up_North_[MA]'].values)
-    pdyn    = np.interp(t_mp,t_sw,solarwind['pdyn'].values)
-    times   = np.array([t/3600e9 for t in t_mp])
-    BOYLE   = np.interp(t_mp,t_sw,solarwind['CPCP_B97'].values)
-    SHILL   = np.interp(t_mp,t_sw,solarwind['CPCP_S02'].values)
-    KRID    = np.interp(t_mp,t_sw,solarwind['CPCP_K08'].values)
-
-
-    # Figure
-    fig = plt.figure(figsize=[32,30])
-    # GridSpecs #TODO reduce whitespace
-    sliver = plt.GridSpec(1,2,hspace=0.1,figure=fig,
-                             left=0.06,right=0.92,bottom=0.04,top=0.98,
-                             width_ratios=[56,1],wspace=0.1)
-    mainsplit = sliver[0].subgridspec(1,2,width_ratios=[1.7,6.3],wspace=0.15)
-    fourstack = mainsplit[0].subgridspec(4,1,hspace=0.2)
-    sixpack = mainsplit[1].subgridspec(3,2,hspace=0.05,wspace=0.1)
-    # Declare axes
-    fit_ax1 = fig.add_subplot(fourstack[0])
-    fit_ax2 = fig.add_subplot(fourstack[1])
-    fit_ax3 = fig.add_subplot(fourstack[2])
-    fit_ax4 = fig.add_subplot(fourstack[3])
-
-    model_ax1 = fig.add_subplot(sixpack[0,0])
-    model_ax2 = fig.add_subplot(sixpack[0,1])
-    model_ax3 = fig.add_subplot(sixpack[1,0])
-    model_ax4 = fig.add_subplot(sixpack[1,1])
-    model_ax5 = fig.add_subplot(sixpack[2,0])
-    model_ax6 = fig.add_subplot(sixpack[2,1])
-
-    # Plot
-    fit_ax1,sc = draw_fit_resid_panel(fit_ax1,Ein,K1,times)
-    fit_ax2,sc = draw_fit_resid_panel(fit_ax2,K1[K1>0],FAC[K1>0],
-                                        times[K1>0],form='sq')
-    fit_ax3,sc = draw_fit_resid_panel(fit_ax3,FAC,CPCP,times)
-    fit_ax4,sc = draw_fit_resid_panel(fit_ax4,Ein,CPCP,times,form='sq')
-
-    model_ax1,sc = draw_model_resid_panel(model_ax1,BOYLE,CPCP,times)
-    model_ax3,sc = draw_model_resid_panel(model_ax3,SHILL,CPCP,times)
-    model_ax5,sc = draw_model_resid_panel(model_ax5,KRID,CPCP,times)
-
-    model_ax2,sc = draw_fit_resid_panel(model_ax2,Esw,CPCP,times)
-    model_ax4,sc = draw_fit_resid_panel(model_ax4,K1[K1>0],CPCP[K1>0],
-                                        times[K1>0],form='sq')
-    model_ax6,sc = draw_fit_resid_panel(model_ax6,AMP_FAC,CPCP,times)
-    # Decorate
-    cb_ax = fig.add_axes([0.92,.084,.02,.854])
-    #cb_ax = fig.add_axes([0.88,.124,.04,.754])
-    cb = fig.colorbar(sc,orientation='vertical',cax=cb_ax)
-    #cb.set_label(r"$p_{dyn}\left[nPa\right]$",fontsize=36)
-    cb.set_label(r"$T-$ 11-01:30:00 $\left[Hr\right]$",fontsize=36)
-
-    fit_ax1.set_xlabel(r'predict. '+K1label())
-    fit_ax1.set_ylabel(r'$E_{in}$ Fit Resid.')
-    fit_ax1.set_ylim([-100,50])
-
-    fit_ax2.set_xlabel(r'predict. $\int$FAC $\left[MA\right]$')
-    fit_ax2.set_ylabel(K1label()+' (sqrt) Fit Resid.')
-
-    fit_ax3.set_xlabel(r'predict. CPCP $\left[kV\right]$')
-    fit_ax3.set_ylabel(r'$FAC$ Fit Resid.')
-
-    fit_ax4.set_xlabel(r'predict. CPCP $\left[kV\right]$')
-    fit_ax4.set_ylabel(r'$E_{in}$ (sqrt) Fit Resid.')
-
-    model_ax1.set_ylabel(r"Boyle'97 - SWMF")
-    model_ax3.set_ylabel(r"Siscoe-Hill'02 - SWMF")
-    model_ax5.set_ylabel(r"Kivelson-Ridley'08 - SWMF")
-    model_ax5.set_xlabel(r"Predicted CPCP $\left[kV\right]$")
-
-    model_ax2.set_ylabel(r"$E_{KL}$ - SWMF")
-    model_ax4.set_ylabel(
-            r"$\sqrt{\overline{\int_O{\mathbf{K}\cdot\mathbf{n}}}}$ - SWMF")
-    model_ax6.set_ylabel(r"AMPERE $FAC$ - SWMF")
-    model_ax6.set_xlabel(r"Predicted CPCP $\left[kV\right]$")
-
-    for i,ax in enumerate([model_ax1,model_ax2,model_ax3,
-                           model_ax4,model_ax5,model_ax6]):
-        if i==1 or i==3 or i==5:
-            ax.yaxis.tick_right()
-            ax.yaxis.set_label_position("right")
-        else:
-            ax.margins(x=0.01)
-        if i!=4 and i!=5:
-            ax.set_xticklabels([])
-        ax.set_xlim([0,800])
-        ax.set_ylim([-2,6])
-    fig.patches.extend([plt.Rectangle([0,0.25],0.23,1,fill=True,fc='plum',
-                   alpha=0.2,zorder=-1,transform=fig.transFigure,figure=fig)])
-    fig.patches.extend([plt.Rectangle([0,0],0.23,0.25,fill=True,fc='grey',
-                   alpha=0.5,zorder=-1,transform=fig.transFigure,figure=fig)])
-
-    # Save
-    figurename = f"{path}/figure4.png"
-    fig.savefig(figurename)
-    plt.close(fig)
-    print('\033[92m Created\033[00m',figurename)
-
-'''
 #############################################################################
 
 def main() -> None:
     ## Global variables and file paths
-    global TINIT,TEND,TCUT,TMIN
+    global TINIT,TEND,TCUT,TMAIN,TMIN
     TINIT = dt.datetime(2024,5,10,13,0)
     TIMPACT = dt.datetime(2024,5,10,17)
+    TMAIN = dt.datetime(2024,5,10,17,54)
     TCUT = dt.datetime(2024,5,11,10,0)
     TMIN  = dt.datetime(2024,5,11,1,30)
     TEND  = dt.datetime(2024,5,11,17,0)
@@ -1064,6 +810,7 @@ def main() -> None:
     swmf_log = dataset['obs']['swmf_log']
     omni = dataset['obs']['omni']
     pc = dataset['obs']['pc']
+    from IPython import embed; embed()
     #magfile = "../data/large/GM/IO2/magnetometers_e20240510-130000.mag"
     #vmagnets = loadmagnetometers(magfile)
     magfile = "../data/logs/magnetometers_e20240510-130000.npz"
@@ -1119,11 +866,10 @@ def main() -> None:
     dataset['ampere'] = all_data
     I_ampere = dataset['ampere']
 
-    from IPython import embed; embed()
     ## Create Figures
     #plot_figure_1(unfiled,solarwind,swmf_log,mp,omni)
     #plot_figure_2(unfiled,sats,vsats,vmagnets,I_ampere,I_swmf,pc,swmf_log)
-    #plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
+    plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     #plot_figure_4(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
 
 

@@ -130,14 +130,55 @@ def plot_iono_projection(ie:dict,dmsp:dict,path:str) -> None:
     plt.show()
 ##############################################################################
 def plot_jpar_dist(ie:dict,outpath:str) -> None:
+    times = ie['N']['time']
+    jrbins,binwidth = np.linspace(0,2,50,retstep=True)
+    pdf_max = 1/binwidth
+    pdf = np.zeros([len(times),49])
+    p0 = np.zeros(len(times))
+    p1 = np.zeros(len(times))
     for it in range(0,1681):
         jr = ie['N']["JR [`mA/m^2]"][it,:]
         area = ie['N']["Area [Re^2]"][it,:][jr>0]
-        hist,edge = np.histogram(jr[jr>0],bins=50,weights=area,density=True)
-        bins = np.array([(edge[i]+edge[i+1])/2 for i in range(0,50)])
-        p0 = np.trapezoid(hist[bins<=0.5],x=bins[bins<=0.5])
-        p1 = np.trapezoid(hist[bins>0.5],x=bins[bins>0.5])
+        hist,edge = np.histogram(jr[jr>0],bins=jrbins,
+                                 weights=area,density=True)
+        pdf[it] = hist
+        p0[it] = np.sum(hist[edge[0:-1]<=0.5]*binwidth)
+        p1[it] = np.sum(hist[edge[0:-1]>0.5]*binwidth)
 
+    dtimes = np.array([(t-times[0]).total_seconds()/60 for t in times])
+    bins = np.array([(edge[i]+edge[i+1])/2 for i in range(0,49)])
+    T,J = np.meshgrid(dtimes,bins)
+
+    ## Plot
+    # fig setup
+    fig,ax = plt.subplots(1,1,figsize=[18,10])
+    rax = ax.twinx()
+
+    # contour
+    ax.contourf(T,J,pdf.T,levels=np.linspace(0,0.5,11),
+                 cmap='plasma',extend='both')
+    ax.set_ylim(0,2)
+
+    # integrated probability
+    rax.plot(dtimes,p1,c='grey')
+    rax.set_ylim(0,1)
+    rax.tick_params(axis='y',colors='grey')
+
+    # 0.5 line
+    ax.axhline(0.5,c='cyan',lw='3')
+
+    # Decorate
+    ax.set_xlabel('Time [minutes]')
+    ax.set_ylabel(r'$J_r\left[ \mu A / m^2 \right]$')
+    rax.set_ylabel(r'Prob.($J_r>0.5\left[\mu A / m^2\right]$',c='grey')
+
+    # Save
+    fig.tight_layout()
+    plt.savefig(f"{outpath}/jr_keyogram.png")
+    plt.close(fig)
+    print(f"\033[92m Created\033[00m {outpath}/jr_keyogram.png")
+
+    '''
         fig,ax = plt.subplots(1,1,figsize=[12,10])
         ax.plot(bins,hist,c='black')
         ax.fill_between(bins[bins<=0.5],hist[bins<=0.5],fc='blue',alpha=0.5)
@@ -157,6 +198,7 @@ def plot_jpar_dist(ie:dict,outpath:str) -> None:
         plt.savefig(f"{outpath}/jr/jr_{it:04d}.png")
         plt.close(fig)
         print(f"\033[92m Created\033[00m {outpath}/jr_{it}.png")
+    '''
 ##############################################################################
 @jit(nopython=True, parallel=True)
 def dumb_2D_interp(x:np.ndarray,y:np.ndarray,z:np.ndarray,
