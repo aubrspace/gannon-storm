@@ -138,6 +138,7 @@ def plot_jpar_dist(ie:dict,outpath:str) -> None:
     p1 = np.zeros(len(times))
     for it in range(0,1681):
         jr = ie['N']["JR [`mA/m^2]"][it,:]
+        #TODO add conductance
         area = ie['N']["Area [Re^2]"][it,:][jr>0]
         hist,edge = np.histogram(jr[jr>0],bins=jrbins,
                                  weights=area,density=True)

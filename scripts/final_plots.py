@@ -8,8 +8,10 @@ import scipy
 import statsmodels.api as sm
 import datetime as dt
 import pandas as pd
+import matplotlib as mpl
 from matplotlib import pyplot as plt
 from matplotlib import cm
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from cmcrameri import cm as cm2
 #
 from global_energetics.analysis.plot_tools import (pyplotsetup,
@@ -34,7 +36,7 @@ from global_energetics.wind_to_swmfInput import (collect_themis,collect_mms,
 from supermag_api import (SuperMAGGetInventory,SuperMAGGetData,
                           SuperMAGGetIndices)
 
-def K1label():
+def K1label() -> str:
     return r'$\overline{\int_O{\mathbf{K}\cdot\mathbf{n}}}$'
 
 
@@ -365,25 +367,36 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
 def draw_scatter_panel(ax:plt.Axes,
                         X:pd.DataFrame,
                         Y:pd.DataFrame,
-               scat_color:np.ndarray, **kwargs:dict) ->[plt.Axes,plt.scatter]:
-    # Get Pearson r
-    slope,intercept,r,p,std_err = scipy.stats.linregress(X.values,Y.values)
-    # Obtain low,50, and high %tiles, and variance binned by our X axis
-    X_bins   = np.linspace(X.quantile(0.005),X.quantile(0.995),33)
-    bin_Ranges = bin_and_describe(X,Y,Y,X_bins,0.05,0.95)
-    # Plot
-    if kwargs.get('text_loc','left')=='left':
-        ax.text(0.02,0.94,r'$R^2$'+f'={r**2:.2f}',transform=ax.transAxes,
-                                      c='dimgrey',horizontalalignment='left')
-    elif kwargs.get('text_loc','left')=='right':
-        ax.text(0.98,0.94,r'$R^2$'+f'={r**2:.2f}',transform=ax.transAxes,
-                                     c='dimgrey',horizontalalignment='right')
-    extended_fill_between(ax,X_bins,bin_Ranges['pLow_all'],
-                                    bin_Ranges['pHigh_all'],'gold',0.2)
-    sc = ax.scatter(X,Y,cmap=cm.winter,c=scat_color,
-                        s=50,alpha=0.8)
-    ax.plot(X_bins,bin_Ranges['p50_all'],c='black',lw=4)
-    ax.plot(X_bins,slope*X_bins+intercept,c='grey',ls='--',lw=3)
+               scat_color:str, **kwargs:dict) ->[plt.Axes,plt.scatter]:
+    tpre   = X.index<TMAIN
+    tstorm = (X.index>TMAIN)&(X.index<TMIN)
+    trecovery = X.index>TMIN
+    colors = ['red','blue','purple']
+    markers = ['x','o','+']
+    for i,phase in enumerate([tpre,tstorm,trecovery]):
+        # Get Pearson r
+        slope,intercept,r,p,std_err = scipy.stats.linregress(X[phase].values,
+                                                             Y[phase].values)
+        # Obtain low,50, and high %tiles, and variance binned by our X axis
+        X_bins   = np.linspace(X[phase].quantile(0.005),
+                               X[phase].quantile(0.995),33)
+        bin_Ranges = bin_and_describe(X[phase],Y[phase],Y[phase],X_bins,
+                                      0.05,0.95)
+        # Plot
+        if kwargs.get('text_loc','left')=='left':
+            ax.text(0.02,1-0.06*i,r'$R^2$'+f'={r**2:.2f}',
+                    transform=ax.transAxes,
+                    c=colors[i],horizontalalignment='left')
+        elif kwargs.get('text_loc','left')=='right':
+            ax.text(0.98,1-0.06*i,r'$R^2$'+f'={r**2:.2f}',
+                    transform=ax.transAxes,
+                    c=colors[i],horizontalalignment='right')
+        extended_fill_between(ax,X_bins,bin_Ranges['pLow_all'],
+                                        bin_Ranges['pHigh_all'],'gold',0.2)
+        sc = ax.scatter(X[phase],Y[phase],c=colors[i],marker=markers[i],
+                            s=50,alpha=0.8)
+        ax.plot(X_bins,bin_Ranges['p50_all'],c=colors[i],lw=4)
+        ax.plot(X_bins,slope*X_bins+intercept,c=colors[i],ls='--',lw=3)
     return ax,sc
 
 def draw_fit_resid_panel(ax:plt.Axes,
@@ -453,8 +466,14 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
     KRID    = pd.Series(index=K1.index,
                        data=np.interp(t_mp,t_sw,solarwind['CPCP_K08'].values))
 
+    # Split data into two populations
     tpre   = FAC.index<TMAIN
     tstorm = FAC.index>TMAIN
+    trecovery = FAC.index>TMIN
+    phase = np.zeros(len(K1))
+    phase[tpre] = 0
+    phase[tstorm] = 8
+    phase[trecovery] = 7
 
     K1storm = K1[tstorm]
     Einstorm = Ein[tstorm]
@@ -481,26 +500,6 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
     KRIDpre = KRID[tpre]
 
 
-    # Create some models for how the K1 FAC relationship could be fit
-    x = K1[K1>0].values
-    x_sort = x.argsort()
-    x = x[x_sort]
-    X_sq = np.column_stack((x,x**(1/2),np.ones(len(x))))
-    y = FAC[K1>0].iloc[x_sort]
-
-    model_sq = sm.OLS(y,X_sq)
-    result_sq     = model_sq.fit()
-
-    # For Ein predict CPCP
-    x2      = Ein.values
-    x2_sort = x2.argsort()
-    x2      = x2[x2_sort]
-    X2_sq   = np.column_stack((x2,x2**(1/2),np.ones(len(x2))))
-    y2      = CPCP.iloc[x2_sort]
-
-    model2_sq  = sm.OLS(y2,X2_sq)
-    result2_sq = model2_sq.fit()
-
     # Figure
     fig = plt.figure(figsize=[28,30])
     # GridSpecs #TODO reduce whitespace
@@ -519,10 +518,10 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
     ax8 = fig.add_subplot(eightpack[7])
 
     # Plot
-    ax1,scl = draw_scatter_panel(ax1,Esw,K1,pdyn,text_loc='right')
-    ax3,scl = draw_scatter_panel(ax3,K1[K1>0],FAC[K1>0],pdyn[K1>0])
-    ax5,scl = draw_scatter_panel(ax5,FAC,CPCP,pdyn)
-    ax7,scl = draw_scatter_panel(ax7,Ein,CPCP,pdyn)
+    ax1,scl = draw_scatter_panel(ax1,Esw,K1,phase,text_loc='right')
+    ax3,scl = draw_scatter_panel(ax3,K1[K1>0],FAC[K1>0],phase[K1>0])
+    ax5,scl = draw_scatter_panel(ax5,FAC,CPCP,phase)
+    ax7,scl = draw_scatter_panel(ax7,Ein,CPCP,phase)
 
     ax2,scr = draw_fit_resid_panel(ax2,Ein.values,K1.values,times)
     ax4,scr = draw_fit_resid_panel(ax4,K1[K1>0],FAC[K1>0],
@@ -546,18 +545,12 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
 
     ax3.set_xlabel(K1label())
     ax3.set_ylabel(r'$\int$FAC $\left[MA\right]$')
-    ax3.plot(x,result_sq.fittedvalues,c='red',ls='--')
-    ax3.text(0.02,0.88,r'$R^2$'+f'={result_sq.rsquared:.2f}',
-             transform=ax3.transAxes,c='red',horizontalalignment='left')
 
     ax5.set_xlabel(r'$\int$FAC $\left[MA\right]$')
     ax5.set_ylabel(r'CPCP $\left[kV\right]$')
 
     ax7.set_xlabel(r"$E_{in}\left[TW\right]$ Wang'14")
     ax7.set_ylabel(r'CPCP $\left[kV\right]$')
-    ax7.plot(x2,result2_sq.fittedvalues,c='red',ls='--')
-    ax7.text(0.02,0.88,r'$R^2$'+f'={result2_sq.rsquared:.2f}',
-             transform=ax7.transAxes,c='red',horizontalalignment='left')
 
     ax2.set_xlabel(r'predict. '+K1label())
     ax2.set_ylabel(r'$E_{in}$ Fit Resid.')
@@ -810,7 +803,6 @@ def main() -> None:
     swmf_log = dataset['obs']['swmf_log']
     omni = dataset['obs']['omni']
     pc = dataset['obs']['pc']
-    from IPython import embed; embed()
     #magfile = "../data/large/GM/IO2/magnetometers_e20240510-130000.mag"
     #vmagnets = loadmagnetometers(magfile)
     magfile = "../data/logs/magnetometers_e20240510-130000.npz"

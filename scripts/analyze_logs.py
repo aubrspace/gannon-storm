@@ -411,6 +411,17 @@ def plot_saturation(mp_test,dataset,outPath):
             abs(dataset['analysis']['currents']['DOWN_R2_N']))
             #abs(dataset['analysis']['currents']['UP_R2_S'])+
             #abs(dataset['analysis']['currents']['DOWN_R2_N']))
+    '''
+    # Create some models for how the K1 FAC relationship could be fit
+    x = K1[K1>0].values
+    x_sort = x.argsort()
+    x = x[x_sort]
+    X_sq = np.column_stack((x,x**(1/2),np.ones(len(x))))
+    y = FAC[K1>0].iloc[x_sort]
+    '''
+
+    model_sq = sm.OLS(y,X_sq)
+    result_sq     = model_sq.fit()
     #.resample('300s').mean()
     R2  = pd.Series(index=K1.index,data=np.interp(t_test,t_ie,R2.values))
     Upoints = np.linspace(20,85,100)
