@@ -132,23 +132,38 @@ def plot_iono_projection(ie:dict,dmsp:dict,path:str) -> None:
 def plot_jpar_dist(ie:dict,outpath:str) -> None:
     times = ie['N']['time']
     jrbins,binwidth = np.linspace(0,2,50,retstep=True)
+    sbins,sbinwidth = np.linspace(1,25,50,retstep=True)
     pdf_max = 1/binwidth
     pdf = np.zeros([len(times),49])
     p0 = np.zeros(len(times))
     p1 = np.zeros(len(times))
-    for it in range(0,1681):
+    cpcp = np.zeros(len(times))
+    FAC = np.zeros(len(times))
+    Sigma = np.zeros(len(times))
+    for it in tqdm(range(0,1681)):
         jr = ie['N']["JR [`mA/m^2]"][it,:]
-        #TODO add conductance
-        area = ie['N']["Area [Re^2]"][it,:][jr>0]
-        hist,edge = np.histogram(jr[jr>0],bins=jrbins,
-                                 weights=area,density=True)
+        sigmaP = ie['N']["SigmaP [S]"][it,:]
+        area = ie['N']["Area [Re^2]"][it,:]
+
+        cpcp[it] = (ie['N']['PHI [kV]'][it,:].max() -
+                                              ie['N']['PHI [kV]'][it,:].min())
+        FAC[it] = np.sum(jr[jr>0]*area[jr>0])
+        Sigma[it] = cpcp[it]/FAC[it]/1000
+
+        #hist,edge = np.histogram(jr[jr>0],bins=jrbins,
+        #                         weights=area[jr>0],density=True)
+        hist,edge = np.histogram(sigmaP[jr>0],bins=sbins,
+                                 weights=area[jr>0],density=True)
         pdf[it] = hist
-        p0[it] = np.sum(hist[edge[0:-1]<=0.5]*binwidth)
-        p1[it] = np.sum(hist[edge[0:-1]>0.5]*binwidth)
+        #p0[it] = np.sum(hist[edge[0:-1]<=0.5]*binwidth)
+        #p1[it] = np.sum(hist[edge[0:-1]>0.5]*binwidth)
+        p0[it] = np.sum(hist[edge[0:-1]<=15]*binwidth)
+        p1[it] = np.sum(hist[edge[0:-1]>15]*binwidth)
 
     dtimes = np.array([(t-times[0]).total_seconds()/60 for t in times])
     bins = np.array([(edge[i]+edge[i+1])/2 for i in range(0,49)])
-    T,J = np.meshgrid(dtimes,bins)
+    #T,J = np.meshgrid(dtimes,bins)
+    T,S = np.meshgrid(dtimes,bins)
 
     ## Plot
     # fig setup
@@ -156,26 +171,33 @@ def plot_jpar_dist(ie:dict,outpath:str) -> None:
     rax = ax.twinx()
 
     # contour
-    ax.contourf(T,J,pdf.T,levels=np.linspace(0,0.5,11),
+    #ax.contourf(T,J,pdf.T,levels=np.linspace(0,0.5,11),
+    #             cmap='plasma',extend='both')
+    ax.contourf(T,S,pdf.T,levels=np.linspace(0,0.1,11),
                  cmap='plasma',extend='both')
-    ax.set_ylim(0,2)
+    ax.set_ylim(1,25)
 
     # integrated probability
-    rax.plot(dtimes,p1,c='grey')
+    #rax.plot(dtimes,p1,c='grey')
+    #rax.set_ylim(0,1)
+    rax.plot(dtimes,Sigma,c='grey')
     rax.set_ylim(0,1)
     rax.tick_params(axis='y',colors='grey')
 
     # 0.5 line
-    ax.axhline(0.5,c='cyan',lw='3')
+    #ax.axhline(0.5,c='cyan',lw='3')
+    ax.axhline(15,c='cyan',lw='3')
 
     # Decorate
     ax.set_xlabel('Time [minutes]')
-    ax.set_ylabel(r'$J_r\left[ \mu A / m^2 \right]$')
-    rax.set_ylabel(r'Prob.($J_r>0.5\left[\mu A / m^2\right]$',c='grey')
+    #ax.set_ylabel(r'$J_r\left[ \mu A / m^2 \right]$')
+    #rax.set_ylabel(r'Prob.($J_r>0.5\left[\mu A / m^2\right]$)',c='grey')
+    ax.set_ylabel(r'$\Sigma_P\left[ S \right]$')
+    rax.set_ylabel(r'Effective $\Sigma\left[ S \right]$',c='grey')
 
     # Save
     fig.tight_layout()
-    plt.savefig(f"{outpath}/jr_keyogram.png")
+    plt.savefig(f"{outpath}/sigmaP_keyogram.png")
     plt.close(fig)
     print(f"\033[92m Created\033[00m {outpath}/jr_keyogram.png")
 
@@ -270,8 +292,8 @@ def main() -> None:
     ie = {}
     ie['N'] = dict(np.load("../data/large/IE/ionosphere/compiled_N.npz",
                            allow_pickle=True))
-    ie['S'] = dict(np.load("../data/large/IE/ionosphere/compiled_S.npz",
-                           allow_pickle=True))
+    #ie['S'] = dict(np.load("../data/large/IE/ionosphere/compiled_S.npz",
+    #                       allow_pickle=True))
     plot_jpar_dist(ie,"../outputs/figures")
     '''
 
