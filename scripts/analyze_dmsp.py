@@ -11,6 +11,9 @@ from tqdm import tqdm
 from global_energetics.analysis.plot_tools import (pyplotsetup,
                                                    general_plot_settings)
 
+#def n2d(t_in:np.datetime64) -> dt.datetime:
+#    return dt.datetime.fromisoformat(str(t_in))
+
 def draw_swipe_north_tseries(axis:plt.Axes,swipe:dict,**kwargs:dict) -> None:
     axis.plot(swipe['time'],swipe['cpcp_n'],label='SWIPE',color='magenta')
     return
@@ -150,20 +153,20 @@ def plot_jpar_dist(ie:dict,outpath:str) -> None:
         FAC[it] = np.sum(jr[jr>0]*area[jr>0])
         Sigma[it] = cpcp[it]/FAC[it]/1000
 
-        #hist,edge = np.histogram(jr[jr>0],bins=jrbins,
-        #                         weights=area[jr>0],density=True)
-        hist,edge = np.histogram(sigmaP[jr>0],bins=sbins,
+        hist,edge = np.histogram(jr[jr>0],bins=jrbins,
                                  weights=area[jr>0],density=True)
+        #hist,edge = np.histogram(sigmaP[jr>0],bins=sbins,
+        #                         weights=area[jr>0],density=True)
         pdf[it] = hist
-        #p0[it] = np.sum(hist[edge[0:-1]<=0.5]*binwidth)
-        #p1[it] = np.sum(hist[edge[0:-1]>0.5]*binwidth)
-        p0[it] = np.sum(hist[edge[0:-1]<=15]*binwidth)
-        p1[it] = np.sum(hist[edge[0:-1]>15]*binwidth)
+        p0[it] = np.sum(hist[edge[0:-1]<=0.5]*binwidth)
+        p1[it] = np.sum(hist[edge[0:-1]>0.5]*binwidth)
+        #p0[it] = np.sum(hist[edge[0:-1]<=15]*binwidth)
+        #p1[it] = np.sum(hist[edge[0:-1]>15]*binwidth)
 
-    dtimes = np.array([(t-times[0]).total_seconds()/60 for t in times])
+    dtimes = np.array([(t-times[0])/(60*1e6) for t in times])
     bins = np.array([(edge[i]+edge[i+1])/2 for i in range(0,49)])
-    #T,J = np.meshgrid(dtimes,bins)
-    T,S = np.meshgrid(dtimes,bins)
+    T,J = np.meshgrid(dtimes,bins)
+    #T,S = np.meshgrid(dtimes,bins)
 
     ## Plot
     # fig setup
@@ -171,33 +174,34 @@ def plot_jpar_dist(ie:dict,outpath:str) -> None:
     rax = ax.twinx()
 
     # contour
-    #ax.contourf(T,J,pdf.T,levels=np.linspace(0,0.5,11),
-    #             cmap='plasma',extend='both')
-    ax.contourf(T,S,pdf.T,levels=np.linspace(0,0.1,11),
+    ax.contourf(T,J,pdf.T,levels=np.linspace(0,0.5,11),
                  cmap='plasma',extend='both')
-    ax.set_ylim(1,25)
+    ax.set_ylim(0,2)
+    #ax.contourf(T,S,pdf.T,levels=np.linspace(0,0.1,11),
+    #             cmap='plasma',extend='both')
+    #ax.set_ylim(1,25)
 
     # integrated probability
-    #rax.plot(dtimes,p1,c='grey')
-    #rax.set_ylim(0,1)
-    rax.plot(dtimes,Sigma,c='grey')
+    rax.plot(dtimes,p1,c='grey')
     rax.set_ylim(0,1)
+    #rax.plot(dtimes,Sigma,c='grey')
+    #rax.set_ylim(0,1)
     rax.tick_params(axis='y',colors='grey')
 
     # 0.5 line
-    #ax.axhline(0.5,c='cyan',lw='3')
-    ax.axhline(15,c='cyan',lw='3')
+    ax.axhline(0.5,c='cyan',lw='3')
+    #ax.axhline(15,c='cyan',lw='3')
 
     # Decorate
     ax.set_xlabel('Time [minutes]')
-    #ax.set_ylabel(r'$J_r\left[ \mu A / m^2 \right]$')
-    #rax.set_ylabel(r'Prob.($J_r>0.5\left[\mu A / m^2\right]$)',c='grey')
-    ax.set_ylabel(r'$\Sigma_P\left[ S \right]$')
-    rax.set_ylabel(r'Effective $\Sigma\left[ S \right]$',c='grey')
+    ax.set_ylabel(r'$J_r\left[ \mu A / m^2 \right]$')
+    rax.set_ylabel(r'Prob.($J_r>0.5\left[\mu A / m^2\right]$)',c='grey')
+    #ax.set_ylabel(r'$\Sigma_P\left[ S \right]$')
+    #rax.set_ylabel(r'Effective $\Sigma\left[ S \right]$',c='grey')
 
     # Save
     fig.tight_layout()
-    plt.savefig(f"{outpath}/sigmaP_keyogram.png")
+    plt.savefig(f"{outpath}/jr_keyogram.png")
     plt.close(fig)
     print(f"\033[92m Created\033[00m {outpath}/jr_keyogram.png")
 
@@ -248,9 +252,9 @@ def dumb_2D_interp(x:np.ndarray,y:np.ndarray,z:np.ndarray,
 
 def extract_ie_sample(indices:np.ndarray,satellite:dict,ie:dict)-> np.ndarray:
     # Get time into interpolateable format
-    t_sat = np.array([(t-T0).total_seconds()
-                                         for t in satellite['time'][indices]])
-    t_ie = np.array([(t-T0).total_seconds() for t in ie['time']])
+    t_sat = np.array([(t-T0).total_seconds
+                                        for t in satellite['time'][indices]])
+    t_ie = np.array([(t-T0).total_seconds for t in ie['time']])
 
     # Reshape some data for later
     theta = (90-ie['Theta [deg]']).reshape(len(t_ie),181,91)
@@ -290,8 +294,7 @@ def main() -> None:
     plt.rcParams.update(pyplotsetup(mode='print'))
     # Load in .npz files
     ie = {}
-    ie['N'] = dict(np.load("../data/large/IE/ionosphere/compiled_N.npz",
-                           allow_pickle=True))
+    ie['N'] = dict(np.load("../data/large/IE/ionosphere/compiled_N.npz"))
     #ie['S'] = dict(np.load("../data/large/IE/ionosphere/compiled_S.npz",
     #                       allow_pickle=True))
     plot_jpar_dist(ie,"../outputs/figures")

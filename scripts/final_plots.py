@@ -13,6 +13,7 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from cmcrameri import cm as cm2
+from tqdm import tqdm
 #
 from global_energetics.analysis.plot_tools import (pyplotsetup,
                                                    bin_and_describe,
@@ -190,6 +191,7 @@ def draw_vsat_panel(ax:plt.Axes,sats:pd.DataFrame,
 
     ax.plot(goes.index,goes['bz_gsm'],c='black',lw=2,label='GOES16')
     ax.plot(vgoes.index,vgoes['Bz'],c='deepskyblue',lw=4,label='SWMF')
+    ax.axhline(0,c='grey',lw=4)
     return ax
 
 def draw_magnetometer_panel(ax:plt.Axes,vmagnets:pd.DataFrame,
@@ -202,6 +204,7 @@ def draw_magnetometer_panel(ax:plt.Axes,vmagnets:pd.DataFrame,
     ax.plot(supermag.index,supermag['dBn'],label='dBn_sm',c='black',lw=3)
     plot_colorline(swmf_single.index,swmf_single['dBn'].values,
                    swmf_single['mlt'].values,ax)
+    ax.plot(swmf_single.index,swmf_single['dBn'].values,c='grey',label='_no')
     ax.axvline(swmf_single.index[abs(swmf_single['mlt']-9)<0.1][0],
                c='goldenrod',lw=3)
     ax.axvline(swmf_single.index[abs(swmf_single['mlt']-15)<0.1][0],
@@ -222,6 +225,7 @@ def draw_polarcap_panel(ax:plt.Axes,infile:str,**kwargs:dict) -> plt.Axes:
 
 def draw_FAC_panel(ax:plt.Axes,I_ampere:pd.DataFrame,
                    I_swmf:pd.DataFrame,**kwargs:dict) -> plt.Axes:
+    I_ampere = I_ampere.sort_index()
     # Get correlation coefficient for model/data
     t_swmf = [float(t.to_numpy()) for t in I_swmf.index-TMIN]
     t_ampere = [float(t.to_numpy()) for t in I_ampere.index-TMIN]
@@ -244,32 +248,105 @@ def draw_FAC_panel(ax:plt.Axes,I_ampere:pd.DataFrame,
     result_south = model_south.fit()
 
     # Plot
-    ax.plot(I_swmf.index,I_swmf['up_north_MA'],label='SWMF_N',
-             c='blue')
-    ax.plot(I_swmf.index,I_swmf['up_south_MA'],label='SWMF_S',
-             c='purple')
+    ax.plot(I_swmf.index,I_swmf['up_north_MA'],label='SWMF',
+             c='magenta')
+    ax.plot(I_swmf.index,I_swmf['up_south_MA'],label='_SWMF_S',
+             c='magenta',ls='--')
 
     ax.axhline(0,c='grey',lw=1)
 
     ax.plot(I_ampere.index,I_ampere['I_total_up_North_[MA]'],
-             label='AMPERE_N',c='red')
+             label='AMPERE',c='black')
     ax.plot(I_ampere.index,I_ampere['I_total_up_South_[MA]'],
-             label='AMPERE_S',c='orange')
-    ax.text(0.99,0.92,r'$R^2$'+f'={result_north.rsquared:.2f}',
-             transform=ax.transAxes,c='blue',horizontalalignment='right')
-    ax.text(0.99,0.84,r'$R^2$'+f'={result_south.rsquared:.2f}',
-             transform=ax.transAxes,c='purple',horizontalalignment='right')
+             label='_AMPERE_S',c='black',ls='--')
+    ax.text(0.99,0.90,r'$R^2$ North'+f'={result_north.rsquared:.2f}',
+             transform=ax.transAxes,c='black',horizontalalignment='right')
+    ax.text(0.99,0.80,r'$R^2$ South'+f'={result_south.rsquared:.2f}',
+             transform=ax.transAxes,c='black',horizontalalignment='right')
     return ax
 
 def draw_CPCP_panel(ax:plt.Axes,pc:pd.DataFrame,
                     swmf_log:pd.DataFrame,**kwargs:dict) -> plt.Axes:
-    ax.plot(pc.index,pc['cpcpn'],label='Ridley&Kihn',c='black',lw=3)
-    ax.plot(pc.index,pc['cpcps'],label='_Ridley&Kihn',c='black',lw=1.5,
-                                                                      ls='--')
+    #ax.plot(pc.index,pc['cpcpn'],label='Ridley&Kihn',c='black',lw=3)
+    #ax.plot(pc.index,pc['cpcps'],label='_Ridley&Kihn',c='black',lw=1.5,
+    #                                                                  ls='--')
     ax.plot(swmf_log.index,swmf_log['cpcpn'],label='SWMF_N',c='magenta',lw=3)
     ax.plot(swmf_log.index,swmf_log['cpcps'],label='_SWMF_S',c='magenta',
             lw=1.5,ls='--')
     return ax
+
+def draw_swipe_north_tseries(axis:plt.Axes,swipe:dict,**kwargs:dict) -> None:
+    axis.plot(swipe['time'],swipe['cpcp_n'],label='SWIPE',color='orange')
+    return
+
+def draw_swipe_south_tseries(axis:plt.Axes,swipe:dict,**kwargs:dict) -> None:
+    axis.plot(swipe['time'],swipe['cpcp_s'],label='SWIPE',color='orange')
+    return
+
+def draw_dmsp_north_tseries(axis:plt.Axes,dmsp:dict,**kwargs:dict) -> None:
+    axis.plot(dmsp['F16_N']['time'],dmsp['F16_N']['cpcp_kV'],label='DMSP F16',
+              color='red')
+    axis.plot(dmsp['F17_N']['time'],dmsp['F17_N']['cpcp_kV'],label='DMSP F17',
+              color='blue')
+    axis.plot(dmsp['F18_N']['time'],dmsp['F18_N']['cpcp_kV'],label='DMSP F18',
+              color='black')
+    axis.scatter(dmsp['F16_N']['time'],dmsp['F16_N']['cpcp_kV'],label='_F16_N',
+              color='red',s=150,marker='X')
+    axis.scatter(dmsp['F17_N']['time'],dmsp['F17_N']['cpcp_kV'],label='_F17_N',
+              color='blue',s=150,marker='X')
+    axis.scatter(dmsp['F18_N']['time'],dmsp['F18_N']['cpcp_kV'],label='_F18_N',
+              color='black',s=150,marker='X')
+    return
+
+def draw_dmsp_south_tseries(axis:plt.Axes,dmsp:dict,**kwargs:dict) -> None:
+    axis.plot(dmsp['F16_S']['time'],dmsp['F16_S']['cpcp_kV'],label='DMSP F16',
+              color='red')
+    axis.plot(dmsp['F17_S']['time'],dmsp['F17_S']['cpcp_kV'],label='DMSP F17',
+              color='blue')
+    axis.plot(dmsp['F18_S']['time'],dmsp['F18_S']['cpcp_kV'],label='DMSP F18',
+              color='black')
+    axis.scatter(dmsp['F16_S']['time'],dmsp['F16_S']['cpcp_kV'],label='_F16_S',
+              color='red',s=150,marker='X')
+    axis.scatter(dmsp['F17_S']['time'],dmsp['F17_S']['cpcp_kV'],label='_F17_S',
+              color='blue',s=150,marker='X')
+    axis.scatter(dmsp['F18_S']['time'],dmsp['F18_S']['cpcp_kV'],label='_F18_S',
+              color='black',s=150,marker='X')
+    return
+
+def draw_swmf_north_tseries(axis:plt.Axes,dmsp:dict,swmf:dict) -> None:
+    cpcp = [p.max()-p.min() for p in swmf['PHI [kV]']]
+    axis.fill_between(swmf['time'],cpcp,label='SWMF CPCP',
+                      ec='grey',fc='lightgrey')
+    axis.plot(dmsp['F16_N']['time'],dmsp['F16_N']['ie_cpcp'],
+                 label='SWMF F16',color='orange',ls='--')
+    axis.plot(dmsp['F17_N']['time'],dmsp['F17_N']['ie_cpcp'],
+                 label='SWMF F17',color='purple',ls='--')
+    axis.plot(dmsp['F18_N']['time'],dmsp['F18_N']['ie_cpcp'],
+                 label='SWMF F18',color='dimgrey',ls='--')
+    axis.scatter(dmsp['F16_N']['time'],dmsp['F16_N']['ie_cpcp'],
+                 label='_swmfF16',color='orange',s=150,marker='o')
+    axis.scatter(dmsp['F17_N']['time'],dmsp['F17_N']['ie_cpcp'],
+                 label='_swmfF17',color='purple',s=150,marker='o')
+    axis.scatter(dmsp['F18_N']['time'],dmsp['F18_N']['ie_cpcp'],
+                 label='_swmfF18',color='dimgrey',s=150,marker='o')
+    return
+
+def draw_swmf_south_tseries(axis:plt.Axes,dmsp:dict,swmf:dict) -> None:
+    cpcp = [p.max()-p.min() for p in swmf['PHI [kV]']]
+    axis.fill_between(swmf['time'],cpcp,label='swmf_whole',fc='lightgrey')
+    axis.plot(dmsp['F16_S']['time'],dmsp['F16_S']['ie_cpcp'],
+                 label='SWMF F16',color='orange',ls='--')
+    axis.plot(dmsp['F17_S']['time'],dmsp['F17_S']['ie_cpcp'],
+                 label='SWMF F17',color='purple',ls='--')
+    axis.plot(dmsp['F18_S']['time'],dmsp['F18_S']['ie_cpcp'],
+                 label='SWMF F18',color='dimgrey',ls='--')
+    axis.scatter(dmsp['F16_S']['time'],dmsp['F16_S']['ie_cpcp'],
+                 label='_swmfF16',color='orange',s=150,marker='o')
+    axis.scatter(dmsp['F17_S']['time'],dmsp['F17_S']['ie_cpcp'],
+                 label='_swmfF17',color='purple',s=150,marker='o')
+    axis.scatter(dmsp['F18_S']['time'],dmsp['F18_S']['ie_cpcp'],
+                 label='_swmfF18',color='dimgrey',s=150,marker='o')
+    return
 
 def plot_figure_2(path:str,sats:pd.DataFrame,
                           vsats:pd.DataFrame,
@@ -277,7 +354,9 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
                        I_ampere:pd.DataFrame,
                          I_swmf:pd.DataFrame,
                              pc:pd.DataFrame,
-                       swmf_log:pd.DataFrame,**kwargs:dict) -> plt.Axes:
+                       swmf_log:pd.DataFrame,
+                           dmsp:dict,ie:dict,
+                          swipe:dict,**kwargs:dict) -> plt.Axes:
     stations = ['FMC','MEA','T43']
     ampere_path = '../data/ampere/'
     ampere_quicklook='1715372880.north.png'
@@ -290,7 +369,7 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
     # GridSpecs #TODO reduce whitespace
     fivepiece = plt.GridSpec(4,1,hspace=0.1,figure=fig,
                              left=0.09,right=0.95,bottom=0.04,top=0.98,
-                             height_ratios=[1,2,1,1])
+                             height_ratios=[1,2,0.7,1.3])
     middleSection = fivepiece[1].subgridspec(1,2,hspace=0.1,wspace=0.01,
                                              width_ratios=[3,1])
     magPanels = middleSection[0].subgridspec(3,1,hspace=0.05)
@@ -312,7 +391,13 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
     pole_ax1.imshow(ampere_image)
     pole_ax2.imshow(paraview_image)
     fac_ax  = draw_FAC_panel(fac_ax,I_ampere,I_swmf)
-    cpcp_ax = draw_CPCP_panel(cpcp_ax,pc,swmf_log)
+    #cpcp_ax = draw_CPCP_panel(cpcp_ax,pc,swmf_log)
+    draw_swmf_north_tseries(cpcp_ax,dmsp,ie['N'])
+    #draw_swmf_south_tseries(cpcp_ax,dmsp,ie['S'])
+    draw_dmsp_north_tseries(cpcp_ax,dmsp)
+    #draw_dmsp_south_tseries(cpcp_ax,dmsp)
+    draw_swipe_north_tseries(cpcp_ax,swipe)
+    #draw_swipe_south_tseries(cpcp_ax,swipe)
     # Decorate
     general_plot_settings(sat_ax,do_xlabel=False,legend=True,
                           legend_loc='lower left',
@@ -341,15 +426,17 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
     pole_ax2.text(0.98,0.02,f"(f)",transform=pole_ax2.transAxes,
                   c='black',horizontalalignment='right',fontsize=36)
     general_plot_settings(fac_ax,do_xlabel=False,legend=True,
-                          legend_loc='upper left',
+                          legend_loc='upper left',ylim=[0,40],
                           ylabel=r'$\int$FAC $\left[MA\right]$',
                           xlim=[TINIT,TEND], timdelta=False)
     fac_ax.set_xticklabels([])
     fac_ax.text(0.98,0.02,f"(g)",transform=fac_ax.transAxes,
                   c='black',horizontalalignment='right',fontsize=36)
-    general_plot_settings(cpcp_ax,do_xlabel=True,legend=True,
-                          xlim=[TINIT,TEND],ylim=[0,700],
+    general_plot_settings(cpcp_ax,do_xlabel=True,legend=False,
+                          xlim=[TINIT,TEND],ylim=[0,1150],
                           ylabel=r'CPCP $\left[kV\right]$',timedelta=False)
+    cpcp_ax.legend(loc='lower right', bbox_to_anchor=(1.0, 0.60),
+                   ncol=2, fancybox=True, shadow=True)
     cpcp_ax.text(0.98,0.02,f"(h)",transform=cpcp_ax.transAxes,
                   c='black',horizontalalignment='right',fontsize=36)
     for ax in [sat_ax,mag_ax1,mag_ax2,mag_ax3,fac_ax,cpcp_ax]:
@@ -369,11 +456,11 @@ def draw_scatter_panel(ax:plt.Axes,
                         Y:pd.DataFrame,
                scat_color:str, **kwargs:dict) ->[plt.Axes,plt.scatter]:
     tpre   = X.index<TMAIN
-    tstorm = (X.index>TMAIN)&(X.index<TMIN)
+    tstorm = X.index>TMAIN
     trecovery = X.index>TMIN
-    colors = ['red','blue','purple']
-    markers = ['x','o','+']
-    for i,phase in enumerate([tpre,tstorm,trecovery]):
+    team_colors = ['red','blue']
+    markers = ['o','o']
+    for i,phase in enumerate([tpre,tstorm]):
         # Get Pearson r
         slope,intercept,r,p,std_err = scipy.stats.linregress(X[phase].values,
                                                              Y[phase].values)
@@ -384,19 +471,31 @@ def draw_scatter_panel(ax:plt.Axes,
                                       0.05,0.95)
         # Plot
         if kwargs.get('text_loc','left')=='left':
-            ax.text(0.02,1-0.06*i,r'$R^2$'+f'={r**2:.2f}',
+            ax.text(0.02,0.94-0.06*i,r'$R^2$'+f'={r**2:.2f}',
                     transform=ax.transAxes,
-                    c=colors[i],horizontalalignment='left')
+                    c=team_colors[i],horizontalalignment='left')
         elif kwargs.get('text_loc','left')=='right':
-            ax.text(0.98,1-0.06*i,r'$R^2$'+f'={r**2:.2f}',
+            ax.text(0.98,0.94-0.06*i,r'$R^2$'+f'={r**2:.2f}',
                     transform=ax.transAxes,
-                    c=colors[i],horizontalalignment='right')
+                    c=team_colors[i],horizontalalignment='right')
         extended_fill_between(ax,X_bins,bin_Ranges['pLow_all'],
                                         bin_Ranges['pHigh_all'],'gold',0.2)
-        sc = ax.scatter(X[phase],Y[phase],c=colors[i],marker=markers[i],
-                            s=50,alpha=0.8)
-        ax.plot(X_bins,bin_Ranges['p50_all'],c=colors[i],lw=4)
-        ax.plot(X_bins,slope*X_bins+intercept,c=colors[i],ls='--',lw=3)
+        sc = ax.scatter(X[phase],Y[phase],marker=markers[i],
+                        c=scat_color[phase],ec=team_colors[i],
+                            s=50,alpha=0.8,vmin=0,vmax=40,cmap='Grays')
+        ax.plot(X_bins,bin_Ranges['p50_all'],c=team_colors[i],lw=4)
+        ax.plot(X_bins,slope*X_bins+intercept,c=team_colors[i],ls='--',lw=3)
+    # Get Pearson r for all data
+    slope,intercept,r,p,std_err = scipy.stats.linregress(X.values,
+                                                         Y.values)
+    if kwargs.get('text_loc','left')=='left':
+        ax.text(0.02,0.94-0.06*(i+1),r'$R^2$'+f'={r**2:.2f}',
+                transform=ax.transAxes,c='grey',horizontalalignment='left')
+    elif kwargs.get('text_loc','left')=='right':
+        ax.text(0.98,0.94-0.06*(i+1),r'$R^2$'+f'={r**2:.2f}',
+                transform=ax.transAxes,c='grey',horizontalalignment='right')
+    X_bins   = np.linspace(X.quantile(0.005),X.quantile(0.995),33)
+    ax.plot(X_bins,slope*X_bins+intercept,c='grey',ls='--',lw=3)
     return ax,sc
 
 def draw_fit_resid_panel(ax:plt.Axes,
@@ -404,24 +503,33 @@ def draw_fit_resid_panel(ax:plt.Axes,
                             y:np.ndarray,
                    scat_color:np.ndarray,
                            **kwargs:dict)->[plt.Axes,plt.scatter]:
-    x_sort = x.argsort()
-    x = x[x_sort]
-    # Create a model for prediction using Ordinary Least Squares regression
-    if kwargs.get('form','linear')=='linear':
-        X = np.column_stack((x,np.ones(len(x))))
-    elif kwargs.get('form','linear')=='sq':
-        X = np.column_stack((x,x**(1/2),np.ones(len(x))))
-    elif kwargs.get('form','linear')=='cu':
-        X = np.column_stack((x,x**(1/3),np.ones(len(x))))
-    y = y[x_sort]
+    tpre   = x.index<TMAIN
+    tstorm = x.index>TMAIN
+    team_colors = ['red','blue']
+    markers = ['o','o']
+    for i,phase in enumerate([tpre,tstorm]):
+        xp = x[phase]
+        yp = y[phase]
+        colors = scat_color[phase]
+        x_sort = xp.argsort()
+        xp = xp[x_sort]
+        # Create a model for prediction using Ordinary Least Squares regression
+        if kwargs.get('form','linear')=='linear':
+            X = np.column_stack((xp,np.ones(len(xp))))
+        elif kwargs.get('form','linear')=='sq':
+            X = np.column_stack((xp,xp**(1/2),np.ones(len(xp))))
+        elif kwargs.get('form','linear')=='cu':
+            X = np.column_stack((xp,xp**(1/3),np.ones(len(xp))))
+        yp = yp[x_sort]
 
-    model  = sm.OLS(y,X)
-    result = model.fit()
+        model  = sm.OLS(yp,X)
+        result = model.fit()
 
-    sc = ax.scatter(result.fittedvalues,
-                    (result.fittedvalues-y)/y,
-                    s=50,alpha=0.8,cmap=cm.managua,c=scat_color[x_sort])
-    ax.axhline(0,c='grey')
+        sc = ax.scatter(result.fittedvalues,
+                        (result.fittedvalues-yp)/yp,
+                        s=50,alpha=0.8,cmap='Grays',vmin=0,vmax=40,
+                        c=colors[x_sort],ec=team_colors[i])
+    ax.axhline(0,c='gray')
     return ax, sc
 
 def draw_model_resid_panel(ax:plt.Axes,
@@ -504,7 +612,7 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
     fig = plt.figure(figsize=[28,30])
     # GridSpecs #TODO reduce whitespace
     slivers = plt.GridSpec(1,3,hspace=0.1,figure=fig,
-                             left=0.06,right=0.92,bottom=0.04,top=0.98,
+                             left=0.06,right=0.95,bottom=0.04,top=0.98,
                              width_ratios=[4,56,4],wspace=0.1)
     eightpack = slivers[1].subgridspec(4,2,hspace=0.2,wspace=0.1)
     # Declare axes
@@ -518,24 +626,24 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
     ax8 = fig.add_subplot(eightpack[7])
 
     # Plot
-    ax1,scl = draw_scatter_panel(ax1,Esw,K1,phase,text_loc='right')
-    ax3,scl = draw_scatter_panel(ax3,K1[K1>0],FAC[K1>0],phase[K1>0])
-    ax5,scl = draw_scatter_panel(ax5,FAC,CPCP,phase)
-    ax7,scl = draw_scatter_panel(ax7,Ein,CPCP,phase)
+    ax1,scl = draw_scatter_panel(ax1,Esw,K1,pdyn,text_loc='right')
+    ax3,scl = draw_scatter_panel(ax3,K1[K1>0],FAC[K1>0],pdyn[K1>0])
+    ax5,scl = draw_scatter_panel(ax5,FAC,CPCP,pdyn)
+    ax7,scl = draw_scatter_panel(ax7,Ein,CPCP,pdyn)
 
-    ax2,scr = draw_fit_resid_panel(ax2,Ein.values,K1.values,times)
-    ax4,scr = draw_fit_resid_panel(ax4,K1[K1>0],FAC[K1>0],
-                                        times[K1>0],form='sq')
-    ax6,scr = draw_fit_resid_panel(ax6,FAC.values,CPCP.values,times)
-    ax8,scr = draw_fit_resid_panel(ax8,Ein.values,CPCP.values,times,form='sq')
+    ax2,scr = draw_fit_resid_panel(ax2,Ein,K1,pdyn)
+    ax4,scr = draw_fit_resid_panel(ax4,K1[K1>0],FAC[K1>0],pdyn[K1>0])
+    ax6,scr = draw_fit_resid_panel(ax6,FAC,CPCP,pdyn)
+    ax8,scr = draw_fit_resid_panel(ax8,Ein,CPCP,pdyn)
 
     # Decorate
     cb_axl = fig.add_axes([0.06,.084,.02,.854])
-    cb_axr = fig.add_axes([0.92,.084,.02,.854])
+    #cb_axr = fig.add_axes([0.92,.084,.02,.854])
     cbl = fig.colorbar(scl,orientation='vertical',cax=cb_axl)
-    cbr = fig.colorbar(scr,orientation='vertical',cax=cb_axr)
+    #cbr = fig.colorbar(scr,orientation='vertical',cax=cb_axr)
+    cbl.set_ticks(np.linspace(0,40,11))
     cbl.set_label(r"$p_{dyn}\left[nPa\right]$",fontsize=36)
-    cbr.set_label(r"$T-$ 11-01:30:00 $\left[Hr\right]$",fontsize=36)
+    #cbr.set_label(r"$T-$ 11-01:30:00 $\left[Hr\right]$",fontsize=36)
 
     cb_axl.yaxis.set_ticks_position("left")
     cb_axl.yaxis.set_label_position("left")
@@ -574,8 +682,9 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
                 #ax.set_ylim([-1,8])
                 ax.set_ylim([-1,1])
             else:
+                ax.set_ylim([-5,5])
                 ax.axhline(-1,c='grey',ls='--')
-                ax.axhline(8,c='grey',ls='--')
+                ax.axhline(1,c='grey',ls='--')
         ax.text(0.98,0.02,f"{letters[i]}",transform=ax.transAxes,
                 c='black',horizontalalignment='right',fontsize=36)
     #fig.patches.extend([plt.Rectangle([0,0.25],0.23,1,fill=True,fc='plum',
@@ -770,6 +879,94 @@ def plot_figure_4(path:str,solarwind:pd.DataFrame,
     fig.savefig(figurename)
     plt.close(fig)
     print('\033[92m Created\033[00m',figurename)
+#############################################################################
+
+def draw_dmsp_scat(ax:plt.Axis,dmsp:dict,X:pd.Series) -> None:
+    t_x = [float(t.to_numpy()) for t in X.index-TMIN]
+    # Interpolate the plotting variable Y for each sat in dmsp
+    for sat in ['F16_N','F17_N','F18_N']:
+        times = dmsp[sat]['time']
+        t_dmsp = [(t-TMIN).total_seconds()*1e9 for t in times]
+        Y = pd.Series(index=times,data=np.interp(t_dmsp,t_x,X.values))
+        ax.scatter(X,Y,label=sat)
+        #TODO finish by calling scatter with the interp'd Y
+    return #the scatter object?
+
+
+def plot_figure_5(path:str,solarwind:pd.DataFrame,
+                                  mp:pd.DataFrame,
+                              I_swmf:pd.DataFrame,
+                            I_ampere:pd.DataFrame,
+                            swmf_log:pd.DataFrame,
+                  dmsp:dict,ie:dict,swipe:dict,**kwargs:dict) -> None:
+    # Get data to a common time axis
+    t_sw = [float(t.to_numpy()) for t in solarwind.index-TMIN]
+    t_mp = [float(t.to_numpy()) for t in mp.index-TMIN]
+    t_log = [float(t.to_numpy()) for t in swmf_log.index-TMIN]
+    t_ie   = [float(t.to_numpy()) for t in I_swmf.index-TMIN]
+    t_ampere = [float(t.to_numpy()) for t in I_ampere.index-TMIN]
+    K1  = (mp['K_netK1 [W]']+mp['UtotM1 [W]']).rolling('600s').mean()/-1e12
+    Ein = pd.Series(index=K1.index,
+                   data=np.interp(t_mp,t_sw,solarwind['EinWang'].values/1e12))
+    Esw = pd.Series(index=K1.index,
+                     data=np.interp(t_mp,t_sw,solarwind['Esw'].values/1e3))
+    CPCP= pd.Series(index=K1.index,
+                     data=np.interp(t_mp,t_log,swmf_log['cpcpn'].values))
+    FAC  = pd.Series(index=K1.index,data=np.interp(t_mp,t_ie,
+                      (I_swmf['up_north_MA']).values))
+    AMP_FAC = pd.Series(index=K1.index,data=np.interp(t_mp,t_ampere,
+                                    I_ampere['I_total_up_North_[MA]'].values))
+    pdyn = np.interp(t_mp,t_sw,solarwind['pdyn'].values)
+    times   = np.array([t/3600e9 for t in t_mp])
+    BOYLE   = pd.Series(index=K1.index,
+                       data=np.interp(t_mp,t_sw,solarwind['CPCP_B97'].values))
+    SHILL   = pd.Series(index=K1.index,
+                       data=np.interp(t_mp,t_sw,solarwind['CPCP_S02'].values))
+    KRID    = pd.Series(index=K1.index,
+                       data=np.interp(t_mp,t_sw,solarwind['CPCP_K08'].values))
+    dmsp_sparse = {}
+    for sat in ['F16_N','F17_N','F18_N']:
+        clean = np.array([not b for b in np.isnan(dmsp[sat]['cpcp_kV'])])
+        ids = dmsp[sat]['pass_id'][clean]
+        times = dmsp[sat]['time'][clean]
+        cpcp = dmsp[sat]['cpcp_kV'][clean]
+        uids = np.unique(ids)
+        dmsp_sparse[sat] = {}
+        dmsp_sparse[sat]['time'] = []
+        dmsp_sparse[sat]['cpcp_kV'] = np.zeros(len(uids))
+        for i,t in enumerate(uids):
+            pass_times = times[ids==t]
+            dmsp_sparse[sat]['time'].append(pass_times[int(len(pass_times)/2)])
+            dmsp_sparse[sat]['cpcp_kV'][i] = cpcp[ids==t].mean()
+    sparse_times = np.unique(np.concat([dmsp_sparse[sat]['time'] for sat in
+                                        ['F16_N','F17_N','F18_N']]))
+    t_sparse = [(t-TMIN).total_seconds()*1e9 for t in sparse_times]
+    Esw_sparse = pd.Series(index=sparse_times,
+                   data=np.interp(t_sparse,t_sw,solarwind['Esw'].values))
+    AMP_FAC_sparse = pd.Series(index=sparse_times,
+                   data=np.interp(t_sparse,t_ampere,
+                               I_ampere['I_total_up_North_[MA]'].values))
+    from IPython import embed; embed()
+    # Figure
+    fig = plt.figure(figsize=[30,60])
+    # GridSpecs #TODO reduce whitespace
+    columns = plt.GridSpec(1,2,hspace=0.1,figure=fig,
+                             left=0.10,right=0.90,bottom=0.04,top=0.98,
+                             width_ratios=[1,1],wspace=0.25)
+    left = columns[0].subgridspec(3,1,hspace=0.2)
+    right = columns[1].subgridspec(3,1,hspace=0.2)
+    # Declare axes
+    ax_swmf_Esw         = fig.add_subplot(left[0])
+    ax_dmsp_Esw         = fig.add_subplot(left[1])
+    ax_empirical_Esw    = fig.add_subplot(left[2])
+    ax_swmf_ampere      = fig.add_subplot(right[0])
+    ax_dmsp_ampere      = fig.add_subplot(right[1])
+    ax_empirical_ampere = fig.add_subplot(right[2])
+    # Get dmsp in easier to plot set of pass points
+    draw_swmf_cpcp_scatter(ax_swmf_Esw,ie,Esw)
+    # Get all the other data interped onto these points
+    # Compare dmsp pass with 
+    pass
 
 #############################################################################
 
@@ -822,6 +1019,9 @@ def main() -> None:
     lobes = dataset['analysis']['msdict']['lobes']
     plasmasheet = dataset['analysis']['msdict']['plasmasheet']
     inner = dataset['analysis']['inner_mp']
+    ie = {}
+    ie['N'] = dict(np.load("../data/large/IE/ionosphere/compiled_N.npz"))
+    ie['S'] = dict(np.load("../data/large/IE/ionosphere/compiled_S.npz"))
 
     ## Satellite data
     sats = {}
@@ -858,11 +1058,22 @@ def main() -> None:
     dataset['ampere'] = all_data
     I_ampere = dataset['ampere']
 
+    ## DMSP
+    dmsp = {}
+    for sat in tqdm(['F16_N','F17_N','F18_N','F16_S','F17_S','F18_S']):
+        dmsp[sat] = dict(np.load(f"../data/dmsp/compiled_{sat}.npz",
+                           allow_pickle=True))
+
+    ## SWIPE
+    swipe = dict(np.load("../data/swipe/swipe_cpcp.npz",allow_pickle=True))
+
     ## Create Figures
     #plot_figure_1(unfiled,solarwind,swmf_log,mp,omni)
-    #plot_figure_2(unfiled,sats,vsats,vmagnets,I_ampere,I_swmf,pc,swmf_log)
-    plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
+    #plot_figure_2(unfiled,sats,vsats,vmagnets,
+    #              I_ampere,I_swmf,pc,swmf_log,dmsp,ie,swipe)
+    #plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     #plot_figure_4(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
+    plot_figure_5(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log,dmsp,ie,swipe)
 
 
 if __name__ == "__main__":

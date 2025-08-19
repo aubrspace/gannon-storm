@@ -49,7 +49,8 @@ def get_normal_flux(ien:dict,ies:dict) -> list[float,float]:
         binv = ie['RT 1/B [1/T]']
         # Integrate over where the field should be open (1/B < 0)
         for itime in tqdm(range(0,X.shape[0])):
-            openflux = binv[itime,:]<-1e5
+            #openflux = binv[itime,:]<-1e5
+            openflux = binv[itime,:]<-1e7
             flux[ihemi,itime] = np.sum(Br[itime,:][openflux]*
                                      Area[itime,:][openflux]*6371**2/1000)
     return flux
@@ -63,8 +64,6 @@ def draw_cpcp_panel(ax:plt.Axes,
     ax.fill_between(ietimes,cpcp,fc='grey',label='CPCP')
     ax.plot(ietimes,dfdt_ie,c='orange',label=r'$d\phi/dt$ IE')
     ax.plot(gmtimes,dfdt_gm,c='purple',label=r'$d\phi/dt$ GM')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Potential [kV]')
 
 def plot_cpcp_vs(lobes:pd.DataFrame,ie:dict) -> None:
     times = ie['time']
@@ -93,9 +92,34 @@ def plot_cpcp_vs(lobes:pd.DataFrame,ie:dict) -> None:
     draw_cpcp_panel(ax,times,cpcp_n,dfdt_n2,lobes.index,dfdt_lobe2)
     general_plot_settings(ax,legend=True,timedelta=False,
                           xlim=[times[0],times[-1]])
+    ax.set_xlabel('Time May 2024 [dy-hr]')
+    ax.set_ylabel('Potential [kV]')
 
     # Save
     figurename = f"../outputs/figures/unfiled/cpcp_vs_dfdt.png"
+    fig.savefig(figurename)
+    plt.close(fig)
+    print('\033[92m Created\033[00m',figurename)
+
+def plot_Ein_JH(mp:pd.DataFrame,ien:dict,ies:dict) -> None:
+    times = ien['time']
+    joule_heating_n = np.sum(ien['JouleHeat [mW/m^2]']*ies['Area [Re^2]']
+                             *(6371*1e3)**2/1000/1e12,axis=1)
+    joule_heating_s = np.sum(ies['JouleHeat [mW/m^2]']*ies['Area [Re^2]']
+                             *(6371*1e3)**2/1000/1e12,axis=1)
+    joule_heating = joule_heating_n + joule_heating_s
+    Einput = np.convolve(mp['K_netK1 [W]']+mp['UtotM1 [W]'],
+                                            np.ones(10)/10,mode='same')/-1e12
+    fig,ax = plt.subplots(1,1,figsize=[18,9])
+    ax.plot(times,joule_heating,c='red',label='Joule Heating')
+    ax.plot(mp.index,Einput,c='blue',label='Energy Injection')
+    general_plot_settings(ax,legend=True,timedelta=False,
+                          xlim=[times[0],times[-1]])
+    ax.set_xlabel('Time May 2024 [dy-hr]')
+    ax.set_ylabel('Integrated Power [TW]')
+
+    # Save
+    figurename = f"../outputs/figures/unfiled/Ein_vs_JH.png"
     fig.savefig(figurename)
     plt.close(fig)
     print('\033[92m Created\033[00m',figurename)
@@ -119,7 +143,8 @@ def main() -> None:
     ie_solution_S =dict(np.load(f"../data/large/IE/ionosphere/compiled_S.npz",
                                  allow_pickle=True))
 
-    plot_cpcp_vs(lobes,ie_solution_S)
+    #plot_cpcp_vs(lobes,ie_solution_N)
+    plot_Ein_JH(mp,ie_solution_N,ie_solution_S)
 
 if __name__ == "__main__":
     #setting pyplot configurations
