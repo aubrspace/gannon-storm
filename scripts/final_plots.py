@@ -134,6 +134,9 @@ def plot_figure_1(path:str,solarwind:pd.DataFrame,
     # Figure
     fig,axes = plt.subplots(4,figsize=[24,32],sharex=True)
     # Plots
+    for ax in axes[2:4]:
+        ax.axvspan(TINIT,TMAIN,fc='red',alpha=0.1)
+        ax.axvspan(TMAIN,TEND,fc='blue',alpha=0.1)
     axes[0] = draw_imf_panel(axes[0],solarwind)
     axes[1] = draw_plasma_panel(axes[1],solarwind,mp)
     axes[2] = draw_Esw_panel(axes[2],solarwind,mp)
@@ -224,45 +227,41 @@ def draw_polarcap_panel(ax:plt.Axes,infile:str,**kwargs:dict) -> plt.Axes:
     return ax
 
 def draw_FAC_panel(ax:plt.Axes,I_ampere:pd.DataFrame,
-                   I_swmf:pd.DataFrame,**kwargs:dict) -> plt.Axes:
+               I_swmf:pd.DataFrame,swipe:dict,**kwargs:dict) -> plt.Axes:
     I_ampere = I_ampere.sort_index()
     # Get correlation coefficient for model/data
     t_swmf = [float(t.to_numpy()) for t in I_swmf.index-TMIN]
     t_ampere = [float(t.to_numpy()) for t in I_ampere.index-TMIN]
+    t_swipe = [(t-TMIN).total_seconds()*1e9 for t in swipe['time']]
 
     x_north = np.interp(t_swmf,t_ampere,
-                        I_ampere['I_total_up_South_[MA]'].values)
-    x_south = np.interp(t_swmf,t_ampere,
-                        I_ampere['I_total_up_South_[MA]'].values)
+                        I_ampere['I_total_up_North_[MA]'].values)
+    x2_north = np.interp(t_swipe,t_ampere,
+                        I_ampere['I_total_up_North_[MA]'].values)
 
     X_north = np.column_stack((x_north,np.ones(len(x_north))))
-    X_south = np.column_stack((x_south,np.ones(len(x_south))))
+    X2_north = np.column_stack((x2_north,np.ones(len(x2_north))))
 
     y_north = I_swmf['up_north_MA'].values
-    y_south = I_swmf['up_south_MA'].values
+    y2_north = swipe['I_up_N']
 
     model_north = sm.OLS(y_north,X_north)
-    model_south = sm.OLS(y_south,X_south)
+    model2_north = sm.OLS(y2_north,X2_north)
 
     result_north = model_north.fit()
-    result_south = model_south.fit()
+    result2_north = model2_north.fit()
 
     # Plot
+    ax.plot(I_ampere.index,I_ampere['I_total_up_North_[MA]'],
+             label='AMPERE',c='black',lw=3)
     ax.plot(I_swmf.index,I_swmf['up_north_MA'],label='SWMF',
              c='magenta')
-    ax.plot(I_swmf.index,I_swmf['up_south_MA'],label='_SWMF_S',
-             c='magenta',ls='--')
+    ax.plot(swipe['time'],swipe['I_up_N'],label='SWIPE',c='orange')
 
-    ax.axhline(0,c='grey',lw=1)
-
-    ax.plot(I_ampere.index,I_ampere['I_total_up_North_[MA]'],
-             label='AMPERE',c='black')
-    ax.plot(I_ampere.index,I_ampere['I_total_up_South_[MA]'],
-             label='_AMPERE_S',c='black',ls='--')
-    ax.text(0.99,0.90,r'$R^2$ North'+f'={result_north.rsquared:.2f}',
-             transform=ax.transAxes,c='black',horizontalalignment='right')
-    ax.text(0.99,0.80,r'$R^2$ South'+f'={result_south.rsquared:.2f}',
-             transform=ax.transAxes,c='black',horizontalalignment='right')
+    ax.text(0.99,0.90,r'$R^2$'+f'={result_north.rsquared:.2f}',
+             transform=ax.transAxes,c='magenta',horizontalalignment='right')
+    ax.text(0.99,0.80,r'$R^2$'+f'={result2_north.rsquared:.2f}',
+             transform=ax.transAxes,c='orange',horizontalalignment='right')
     return ax
 
 def draw_CPCP_panel(ax:plt.Axes,pc:pd.DataFrame,
@@ -359,10 +358,11 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
                           swipe:dict,**kwargs:dict) -> plt.Axes:
     stations = ['FMC','MEA','T43']
     ampere_path = '../data/ampere/'
-    ampere_quicklook='1715372880.north.png'
+    #ampere_quicklook='1715372880.north.png'
+    ampere_quicklook='1715372880.north_annotated.png'
     ampere_image = plt.imread(f"{ampere_path}{ampere_quicklook}")
     paraview_path = '../outputs/vis/'
-    paraview_compare = 'FAC_ampere_compare.png'
+    paraview_compare = 'FAC_ampere_compare_annotated.png'
     paraview_image = plt.imread(f"{paraview_path}{paraview_compare}")
     # Figure
     fig = plt.figure(figsize=[24,32])
@@ -390,7 +390,7 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
     mag_ax3 = draw_magnetometer_panel(mag_ax3,vmagnets,stations[2])
     pole_ax1.imshow(ampere_image)
     pole_ax2.imshow(paraview_image)
-    fac_ax  = draw_FAC_panel(fac_ax,I_ampere,I_swmf)
+    fac_ax  = draw_FAC_panel(fac_ax,I_ampere,I_swmf,swipe)
     #cpcp_ax = draw_CPCP_panel(cpcp_ax,pc,swmf_log)
     draw_swmf_north_tseries(cpcp_ax,dmsp,ie['N'])
     #draw_swmf_south_tseries(cpcp_ax,dmsp,ie['S'])
@@ -478,8 +478,8 @@ def draw_scatter_panel(ax:plt.Axes,
             ax.text(0.98,0.94-0.06*i,r'$R^2$'+f'={r**2:.2f}',
                     transform=ax.transAxes,
                     c=team_colors[i],horizontalalignment='right')
-        extended_fill_between(ax,X_bins,bin_Ranges['pLow_all'],
-                                        bin_Ranges['pHigh_all'],'gold',0.2)
+        #extended_fill_between(ax,X_bins,bin_Ranges['pLow_all'],
+        #                                bin_Ranges['pHigh_all'],'gold',0.2)
         sc = ax.scatter(X[phase],Y[phase],marker=markers[i],
                         c=scat_color[phase],ec=team_colors[i],
                             s=50,alpha=0.8,vmin=0,vmax=40,cmap='Grays')
@@ -526,7 +526,8 @@ def draw_fit_resid_panel(ax:plt.Axes,
         result = model.fit()
 
         sc = ax.scatter(result.fittedvalues,
-                        (result.fittedvalues-yp)/yp,
+        #                (result.fittedvalues-yp)/yp,
+                        result.fittedvalues-yp,
                         s=50,alpha=0.8,cmap='Grays',vmin=0,vmax=40,
                         c=colors[x_sort],ec=team_colors[i])
     ax.axhline(0,c='gray')
@@ -680,13 +681,15 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
             ax.yaxis.set_label_position("right")
             if i!=1:
                 #ax.set_ylim([-1,8])
-                ax.set_ylim([-1,1])
+                #ax.set_ylim([-1,1])
+                pass
             else:
-                ax.set_ylim([-5,5])
+                #ax.set_ylim([-5,5])
                 ax.axhline(-1,c='grey',ls='--')
                 ax.axhline(1,c='grey',ls='--')
         ax.text(0.98,0.02,f"{letters[i]}",transform=ax.transAxes,
                 c='black',horizontalalignment='right',fontsize=36)
+        ax.grid()
     #fig.patches.extend([plt.Rectangle([0,0.25],0.23,1,fill=True,fc='plum',
     #               alpha=0.2,zorder=-1,transform=fig.transFigure,figure=fig)])
 
@@ -695,6 +698,8 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
     fig.savefig(figurename)
     plt.close(fig)
     print('\033[92m Created\033[00m',figurename)
+
+##############################################################################
 
 def plot_figure_4(path:str,solarwind:pd.DataFrame,
                                   mp:pd.DataFrame,
@@ -881,16 +886,149 @@ def plot_figure_4(path:str,solarwind:pd.DataFrame,
     print('\033[92m Created\033[00m',figurename)
 #############################################################################
 
-def draw_dmsp_scat(ax:plt.Axis,dmsp:dict,X:pd.Series) -> None:
-    t_x = [float(t.to_numpy()) for t in X.index-TMIN]
+def draw_general_scatter(ax:plt.Axes,Y:pd.Series,X:pd.Series,
+                      color:str,label:str,**kwargs:dict)->None:
+    tpre   = X.index<TMAIN
+    tstorm = X.index>TMAIN
+    trecovery = X.index>TMIN
+    phase_name = ['Pre','Storm']
+    team_colors = ['red','blue']
+    markers = ['o','o']
+    text_X,text_Y = kwargs.get('text_xy',[0.02,0.94])
+    text_head = kwargs.get('text_head',r'$R^2$=')
+    for i,phase in enumerate([tpre,tstorm]):
+        # Get Pearson r
+        slope,intercept,r,p,std_err = scipy.stats.linregress(X[phase].values,
+                                                             Y[phase].values)
+        # Obtain low,50, and high %tiles, and variance binned by our X axis
+        X_bins   = np.linspace(X[phase].quantile(0.005),
+                               X[phase].quantile(0.995),33)
+        bin_Ranges = bin_and_describe(X[phase],Y[phase],Y[phase],X_bins,
+                                      0.05,0.95)
+        # Plot
+        if kwargs.get('text_loc','left')=='left':
+            ax.text(text_X,text_Y-0.06*i,f'{text_head}{r**2:.2f}',
+                    transform=ax.transAxes,
+                    c=team_colors[i],horizontalalignment='left')
+        elif kwargs.get('text_loc','left')=='right':
+            ax.text(0.98,0.94-0.06*i,f'{text_head}{r**2:.2f}',
+                    transform=ax.transAxes,
+                    c=team_colors[i],horizontalalignment='right')
+        sc = ax.scatter(X[phase],Y[phase],marker=markers[i],
+                        c=color,ec=team_colors[i],s=50,alpha=0.8,
+                        label=f"{phase_name[i]} {label}")
+        ax.plot(X_bins,bin_Ranges['p50_all'],c=team_colors[i],lw=4)
+        ax.plot(X_bins,slope*X_bins+intercept,c=team_colors[i],ls='--',lw=3)
+    # Get Pearson r for all data
+    slope,intercept,r,p,std_err = scipy.stats.linregress(X.values,
+                                                         Y.values)
+    if kwargs.get('text_loc','left')=='left':
+        ax.text(text_X,text_Y-0.06*(i+1),f'{text_head}{r**2:.2f}',
+                transform=ax.transAxes,c='grey',horizontalalignment='left')
+    elif kwargs.get('text_loc','left')=='right':
+        ax.text(0.98,0.94-0.06*(i+1),f'{text_head}{r**2:.2f}',
+                transform=ax.transAxes,c='grey',horizontalalignment='right')
+    X_bins   = np.linspace(X.quantile(0.005),X.quantile(0.995),33)
+    ax.plot(X_bins,slope*X_bins+intercept,c='grey',ls='--',lw=3)
+    return
+
+def draw_swmf_sparse(ax:plt.Axes,CPCP:pd.Series,dmsp:dict,X:pd.Series) -> None:
+    t_x = np.array([float(t.to_numpy()) for t in X.index-TMIN])
+    xPre   = X.index<TMAIN
+    xStorm = X.index>=TMAIN
+    #ax.scatter(X[xPre],CPCP[xPre],ec='red',c='white',alpha=0.8,s=100,
+    #           label='Pre')
+    #ax.scatter(X[xStorm],CPCP[xStorm],ec='blue',c='white',alpha=0.8,s=100,
+    #           label='Storm')
     # Interpolate the plotting variable Y for each sat in dmsp
-    for sat in ['F16_N','F17_N','F18_N']:
-        times = dmsp[sat]['time']
-        t_dmsp = [(t-TMIN).total_seconds()*1e9 for t in times]
-        Y = pd.Series(index=times,data=np.interp(t_dmsp,t_x,X.values))
-        ax.scatter(X,Y,label=sat)
-        #TODO finish by calling scatter with the interp'd Y
-    return #the scatter object?
+    #colors = ['green','teal','cyan','dodgerblue']
+    markers = ['x','o','+']
+    for i,sat in enumerate(['F16_N','F17_N','F18_N']):
+        if i==0: satlabel='vDMSP Pass'
+        else: satlabel='_nolabel'
+        times = np.array(dmsp[sat]['time'])
+        tstarts = np.array(dmsp[sat]['tstart'])
+        tends = np.array(dmsp[sat]['tend'])
+
+        pre   = (times>=X.index[0]) & (times<TMAIN)
+        storm = (times>=TMAIN)      & (times<X.index[-1])
+
+        X_sparse_pre = np.zeros([len(tstarts[pre]),3])# mean, min, max
+        for i,(start,end) in enumerate(zip(tstarts[pre],tends[pre])):
+            interv = (X.index>start) & (X.index<end)
+            X_sparse_pre[i,0] = X[interv].mean()
+            X_sparse_pre[i,1] = X[interv].mean()-X[interv].quantile(0.25)
+            X_sparse_pre[i,2] = X[interv].quantile(0.75)-X[interv].mean()
+        err_pre = np.array([z for z in zip(X_sparse_pre[:,1],
+                                           X_sparse_pre[:,2])]).T
+
+        X_sparse_storm = np.zeros([len(tstarts[storm]),3])# mean, min, max
+        for i,(start,end) in enumerate(zip(tstarts[storm],tends[storm])):
+            interv = (X.index>start) & (X.index<end)
+            X_sparse_storm[i,0] = X[interv].mean()
+            X_sparse_storm[i,1] = X[interv].mean()-X[interv].quantile(0.25)
+            X_sparse_storm[i,2] = X[interv].quantile(0.75)-X[interv].mean()
+        err_storm = np.array([z for z in zip(X_sparse_storm[:,1],
+                                             X_sparse_storm[:,2])]).T
+
+        ax.scatter(X_sparse_pre[:,0],dmsp[sat]['ie_cpcp'][pre],ec='red',
+                   alpha=0.8,label=satlabel+' Pre',s=200,c='black')
+        ax.scatter(X_sparse_storm[:,0],dmsp[sat]['ie_cpcp'][storm],ec='blue',
+                   label=satlabel+' Storm',s=200,c='black',alpha=0.8)
+
+        ax.errorbar(X_sparse_pre[:,0],dmsp[sat]['ie_cpcp'][pre],
+                    xerr=err_pre,fmt='none',ecolor='black')
+        ax.errorbar(X_sparse_storm[:,0],dmsp[sat]['ie_cpcp'][storm],
+                    xerr=err_storm,fmt='none',ecolor='black')
+
+    return
+
+def draw_dmsp_sparse(ax:plt.Axes,dmsp:dict,X:pd.Series) -> None:
+    t_x = np.array([float(t.to_numpy()) for t in X.index-TMIN])
+    xPre   = X.index<TMAIN
+    xStorm = X.index>=TMAIN
+    # Interpolate the plotting variable Y for each sat in dmsp
+    #colors = ['green','teal','cyan','dodgerblue']
+    markers = ['o','o','o']
+    for i,sat in enumerate(['F16_N','F17_N','F18_N']):
+        if i==0: dolabel=''
+        else: dolabel='_'
+        times = np.array(dmsp[sat]['time'])
+        tstarts = np.array(dmsp[sat]['tstart'])
+        tends = np.array(dmsp[sat]['tend'])
+
+        pre   = (times>=X.index[0]) & (times<TMAIN)
+        storm = (times>=TMAIN)      & (times<X.index[-1])
+
+        X_sparse_pre = np.zeros([len(tstarts[pre]),3])# mean, min, max
+        for i,(start,end) in enumerate(zip(tstarts[pre],tends[pre])):
+            interv = (X.index>start) & (X.index<end)
+            X_sparse_pre[i,0] = X[interv].mean()
+            X_sparse_pre[i,1] = X[interv].mean()-X[interv].quantile(0.25)
+            X_sparse_pre[i,2] = X[interv].quantile(0.75)-X[interv].mean()
+        err_pre = np.array([z for z in zip(X_sparse_pre[:,1],
+                                           X_sparse_pre[:,2])]).T
+
+        X_sparse_storm = np.zeros([len(tstarts[storm]),3])# mean, min, max
+        for i,(start,end) in enumerate(zip(tstarts[storm],tends[storm])):
+            interv = (X.index>start) & (X.index<end)
+            X_sparse_storm[i,0] = X[interv].mean()
+            X_sparse_storm[i,1] = X[interv].mean()-X[interv].quantile(0.25)
+            X_sparse_storm[i,2] = X[interv].quantile(0.75)-X[interv].mean()
+        err_storm = np.array([z for z in zip(X_sparse_storm[:,1],
+                                             X_sparse_storm[:,2])]).T
+
+        ax.errorbar(X_sparse_pre[:,0],dmsp[sat]['cpcp_kV'][pre],
+                    xerr=err_pre,fmt='none',ecolor='red')
+        ax.errorbar(X_sparse_storm[:,0],dmsp[sat]['cpcp_kV'][storm],
+                    xerr=err_storm,fmt='none',ecolor='blue')
+
+        ax.scatter(X_sparse_pre[:,0],dmsp[sat]['cpcp_kV'][pre],ec='red',
+                   alpha=0.8,label=dolabel+'Pre',s=200,c='red')
+        ax.scatter(X_sparse_storm[:,0],dmsp[sat]['cpcp_kV'][storm],ec='blue',
+                   label=dolabel+'Storm',s=200,c='blue',alpha=0.8)
+
+    return
 
 
 def plot_figure_5(path:str,solarwind:pd.DataFrame,
@@ -905,6 +1043,8 @@ def plot_figure_5(path:str,solarwind:pd.DataFrame,
     t_log = [float(t.to_numpy()) for t in swmf_log.index-TMIN]
     t_ie   = [float(t.to_numpy()) for t in I_swmf.index-TMIN]
     t_ampere = [float(t.to_numpy()) for t in I_ampere.index-TMIN]
+    t_swipe = [(t-TMIN).total_seconds()*1e9 for t in swipe['time']]
+
     K1  = (mp['K_netK1 [W]']+mp['UtotM1 [W]']).rolling('600s').mean()/-1e12
     Ein = pd.Series(index=K1.index,
                    data=np.interp(t_mp,t_sw,solarwind['EinWang'].values/1e12))
@@ -917,27 +1057,41 @@ def plot_figure_5(path:str,solarwind:pd.DataFrame,
     AMP_FAC = pd.Series(index=K1.index,data=np.interp(t_mp,t_ampere,
                                     I_ampere['I_total_up_North_[MA]'].values))
     pdyn = np.interp(t_mp,t_sw,solarwind['pdyn'].values)
-    times   = np.array([t/3600e9 for t in t_mp])
     BOYLE   = pd.Series(index=K1.index,
                        data=np.interp(t_mp,t_sw,solarwind['CPCP_B97'].values))
     SHILL   = pd.Series(index=K1.index,
                        data=np.interp(t_mp,t_sw,solarwind['CPCP_S02'].values))
     KRID    = pd.Series(index=K1.index,
                        data=np.interp(t_mp,t_sw,solarwind['CPCP_K08'].values))
+    SWIPE = pd.Series(index=K1.index,
+                      data=np.interp(t_mp,t_swipe,swipe['cpcp_n']))
+    tpre   = FAC.index<TMAIN
+    tstorm = FAC.index>TMAIN
     dmsp_sparse = {}
     for sat in ['F16_N','F17_N','F18_N']:
         clean = np.array([not b for b in np.isnan(dmsp[sat]['cpcp_kV'])])
         ids = dmsp[sat]['pass_id'][clean]
         times = dmsp[sat]['time'][clean]
         cpcp = dmsp[sat]['cpcp_kV'][clean]
+        ie_cpcp = dmsp[sat]['ie_cpcp'][clean]
         uids = np.unique(ids)
-        dmsp_sparse[sat] = {}
-        dmsp_sparse[sat]['time'] = []
-        dmsp_sparse[sat]['cpcp_kV'] = np.zeros(len(uids))
+        i_start = np.zeros(len(uids))
+        i_sparse = np.zeros(len(uids))
+        i_end = np.zeros(len(uids))
         for i,t in enumerate(uids):
-            pass_times = times[ids==t]
-            dmsp_sparse[sat]['time'].append(pass_times[int(len(pass_times)/2)])
-            dmsp_sparse[sat]['cpcp_kV'][i] = cpcp[ids==t].mean()
+            indices = np.where(ids==t)[0]
+            i_start[i] = indices[0]
+            i_sparse[i] = indices[int(len(indices)/2)]
+            i_end[i] = indices[-1]
+        i_start = np.array([int(i) for i in sorted(i_start)])
+        i_sparse = np.array([int(i) for i in sorted(i_sparse)])
+        i_end = np.array([int(i) for i in sorted(i_end)])
+        dmsp_sparse[sat] = {}
+        dmsp_sparse[sat]['time'] = times[i_sparse]
+        dmsp_sparse[sat]['tstart'] = times[i_start]
+        dmsp_sparse[sat]['tend'] = times[i_end]
+        dmsp_sparse[sat]['cpcp_kV'] = cpcp[i_sparse]
+        dmsp_sparse[sat]['ie_cpcp'] = ie_cpcp[i_sparse]
     sparse_times = np.unique(np.concat([dmsp_sparse[sat]['time'] for sat in
                                         ['F16_N','F17_N','F18_N']]))
     t_sparse = [(t-TMIN).total_seconds()*1e9 for t in sparse_times]
@@ -946,15 +1100,15 @@ def plot_figure_5(path:str,solarwind:pd.DataFrame,
     AMP_FAC_sparse = pd.Series(index=sparse_times,
                    data=np.interp(t_sparse,t_ampere,
                                I_ampere['I_total_up_North_[MA]'].values))
-    from IPython import embed; embed()
-    # Figure
-    fig = plt.figure(figsize=[30,60])
-    # GridSpecs #TODO reduce whitespace
+    # Setup Figure
+    fig = plt.figure(figsize=[30,30])
+    # GridSpecs
     columns = plt.GridSpec(1,2,hspace=0.1,figure=fig,
                              left=0.10,right=0.90,bottom=0.04,top=0.98,
-                             width_ratios=[1,1],wspace=0.25)
-    left = columns[0].subgridspec(3,1,hspace=0.2)
-    right = columns[1].subgridspec(3,1,hspace=0.2)
+                             width_ratios=[1,1],wspace=0.1)
+    left = columns[0].subgridspec(3,1,hspace=0.05)
+    right = columns[1].subgridspec(3,1,hspace=0.05)
+
     # Declare axes
     ax_swmf_Esw         = fig.add_subplot(left[0])
     ax_dmsp_Esw         = fig.add_subplot(left[1])
@@ -962,11 +1116,72 @@ def plot_figure_5(path:str,solarwind:pd.DataFrame,
     ax_swmf_ampere      = fig.add_subplot(right[0])
     ax_dmsp_ampere      = fig.add_subplot(right[1])
     ax_empirical_ampere = fig.add_subplot(right[2])
-    # Get dmsp in easier to plot set of pass points
-    draw_swmf_cpcp_scatter(ax_swmf_Esw,ie,Esw)
-    # Get all the other data interped onto these points
-    # Compare dmsp pass with 
-    pass
+
+    # Draw
+    draw_general_scatter(ax_swmf_Esw,CPCP,Esw,'white','SWMF')
+    draw_general_scatter(ax_swmf_ampere,CPCP,AMP_FAC,'white','SWMF')
+    draw_swmf_sparse(ax_swmf_Esw,CPCP,dmsp_sparse,Esw)
+    draw_swmf_sparse(ax_swmf_ampere,CPCP,dmsp_sparse,AMP_FAC)
+    draw_dmsp_sparse(ax_dmsp_Esw,dmsp_sparse,Esw)
+    draw_dmsp_sparse(ax_dmsp_ampere,dmsp_sparse,AMP_FAC)
+    draw_general_scatter(ax_empirical_Esw,BOYLE,Esw,'black','Boyle',
+                         text_head='',text_xy=[0.02,.89])
+    draw_general_scatter(ax_empirical_ampere,BOYLE,AMP_FAC,'black','Boyle',
+                         text_head='',text_xy=[0.02,.89])
+    draw_general_scatter(ax_empirical_Esw,SWIPE,Esw,'white','SWIPE',
+                         text_head='',text_xy=[0.12,.89])
+    draw_general_scatter(ax_empirical_ampere,SWIPE,AMP_FAC,'white','SWIPE',
+                         text_head='',text_xy=[0.12,.89])
+
+    # Decorate
+    label_tag = ['SWMF','DMSP','Empirical']
+    panel_tag = ['(a)','(c)','(e)']
+    for i,ax in enumerate([ax_swmf_Esw,ax_dmsp_Esw,ax_empirical_Esw]):
+        ax.set_ylabel(f'{label_tag[i]} CPCP '+r'$\left[kV\right]$')
+        ax.set_xlim([0,45])
+        ax.set_ylim([0,900])
+        ax.legend()
+        ax.grid()
+        ax.text(0.98,0.02,f"{panel_tag[i]}",transform=ax.transAxes,
+                c='black',horizontalalignment='right',fontsize=36)
+
+    panel_tag = ['(b)','(d)','(f)']
+    for i,ax in enumerate([ax_swmf_ampere,ax_dmsp_ampere,ax_empirical_ampere]):
+        ax.set_ylabel(f'{label_tag[i]} CPCP '+r'$\left[kV\right]$')
+        ax.yaxis.tick_right()
+        ax.yaxis.set_label_position("right")
+        ax.set_xlim([0,38])
+        ax.set_ylim([0,900])
+        #ax.legend()
+        ax.grid()
+        ax.text(0.98,0.02,f"{panel_tag[i]}",transform=ax.transAxes,
+                c='black',horizontalalignment='right',fontsize=36)
+
+    ax_empirical_Esw.set_xlabel(r'$E_{KL} \left[ mA/m\right]$')
+    ax_empirical_ampere.set_xlabel(r'AMPERE TOT. FAC $\left[ MA\right]$')
+
+    ax_empirical_Esw.text(0.02,0.94,r'$\circ R^2$',
+                transform=ax_empirical_Esw.transAxes,
+                c='white',
+                bbox=dict(facecolor='black'),horizontalalignment='left')
+    ax_empirical_Esw.text(0.12,0.94,r'$\circ R^2$',
+                transform=ax_empirical_Esw.transAxes,
+                c='black',horizontalalignment='left')
+
+    ax_empirical_ampere.text(0.02,0.94,r'$\circ R^2$',
+                transform=ax_empirical_ampere.transAxes,
+                c='white',
+                bbox=dict(facecolor='black'),horizontalalignment='left')
+    ax_empirical_ampere.text(0.12,0.94,r'$\circ R^2$',
+                transform=ax_empirical_ampere.transAxes,
+                c='black',horizontalalignment='left')
+
+    # Save
+    figurename = f"{path}/figure5.png"
+    fig.savefig(figurename)
+    plt.close(fig)
+    print('\033[92m Created\033[00m',figurename)
+
 
 #############################################################################
 
@@ -975,7 +1190,8 @@ def main() -> None:
     global TINIT,TEND,TCUT,TMAIN,TMIN
     TINIT = dt.datetime(2024,5,10,13,0)
     TIMPACT = dt.datetime(2024,5,10,17)
-    TMAIN = dt.datetime(2024,5,10,17,54)
+    #TMAIN = dt.datetime(2024,5,10,17,54)
+    TMAIN = dt.datetime(2024,5,10,17,30)
     TCUT = dt.datetime(2024,5,11,10,0)
     TMIN  = dt.datetime(2024,5,11,1,30)
     TEND  = dt.datetime(2024,5,11,17,0)
@@ -1020,8 +1236,10 @@ def main() -> None:
     plasmasheet = dataset['analysis']['msdict']['plasmasheet']
     inner = dataset['analysis']['inner_mp']
     ie = {}
-    ie['N'] = dict(np.load("../data/large/IE/ionosphere/compiled_N.npz"))
-    ie['S'] = dict(np.load("../data/large/IE/ionosphere/compiled_S.npz"))
+    ie['N'] = dict(np.load("../data/large/IE/ionosphere/compiled_N.npz",
+                           allow_pickle=True))
+    ie['S'] = dict(np.load("../data/large/IE/ionosphere/compiled_S.npz",
+                           allow_pickle=True))
 
     ## Satellite data
     sats = {}
@@ -1065,7 +1283,7 @@ def main() -> None:
                            allow_pickle=True))
 
     ## SWIPE
-    swipe = dict(np.load("../data/swipe/swipe_cpcp.npz",allow_pickle=True))
+    swipe = dict(np.load("../data/swipe/swipe_cpcp.npz"))
 
     ## Create Figures
     #plot_figure_1(unfiled,solarwind,swmf_log,mp,omni)

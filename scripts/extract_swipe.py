@@ -61,11 +61,17 @@ def run_swipe(solarwind:pd.DataFrame,path:str) -> None:
     f107 = solarwind['f107'].values
     cpcp_n = np.zeros(len(f107))
     cpcp_s = np.zeros(len(f107))
+    I_up_north = np.zeros(len(f107))
+    I_down_north = np.zeros(len(f107))
+    I_up_south = np.zeros(len(f107))
+    I_down_south = np.zeros(len(f107))
     times = np.array([dt.datetime.strptime(str(t),"%Y-%m-%d %H:%M:%S")
                                                     for t in solarwind.index])
+    times = np.array([np.datetime64(t) for t in times])
     print("Running SWIPE ...")
     for im in tqdm(range(0,len(velocity))):
-        model = SWIPE(velocity[im],By[im],Bz[im],Btilt[im],f107[im])
+        model = SWIPE(velocity[im],By[im],Bz[im],Btilt[im],f107[im],
+                      minlat=50)
         '''
         grid = model.scalargrid
         #NOTE using hard numbers here
@@ -77,14 +83,21 @@ def run_swipe(solarwind:pd.DataFrame,path:str) -> None:
         pot = model.get_potential()
         #pot_north = pot[0:10000].reshape(100,100)
         #pot_south = pot[0:10000].reshape(100,100)
-        
+
         # Calc cpcp 
         cpcp_n[im] = pot[0:10000].max()-pot[0:10000].min()
         cpcp_s[im] = pot[10000::].max()-pot[10000::].min()
+
+        # Calc FAC
+        model.get_AMPS_current()
+        FAC = model.amps.get_integrated_upward_current()
+        I_up_north[im],I_down_north[im],I_up_south[im],I_down_south[im] = FAC
         # Make a plot
         #TODO
-    result = {'time':times,'cpcp_n':cpcp_n,'cpcp_s':cpcp_s}
-    np.savez_compressed(f"{path}/swipe_cpcp.npz",**result)
+    result = {'time':times,'cpcp_n':cpcp_n,'cpcp_s':cpcp_s,
+              'I_up_N':I_up_north,'I_down_N':I_down_north,
+              'I_up_S':I_up_south,'I_down_S':I_down_south}
+    np.savez_compressed(f"{path}/swipe_cpcp.npz",**result,allow_pickle=False)
     print(f'\033[92m Created\033[00m {path}/swipe_cpcp.npz')
 
 def main() -> None:
@@ -98,7 +111,7 @@ def main() -> None:
     solarwind = add_Btilt_to_solarwind(solarwind,"../data/large/GM/IO2/")
 
     run_swipe(solarwind,"../data/swipe")
-    
+
     return
 
 if __name__ == "__main__":
