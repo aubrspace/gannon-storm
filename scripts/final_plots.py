@@ -256,7 +256,7 @@ def draw_FAC_panel(ax:plt.Axes,I_ampere:pd.DataFrame,
              label='AMPERE',c='black',lw=3)
     ax.plot(I_swmf.index,I_swmf['up_north_MA'],label='SWMF',
              c='magenta')
-    ax.plot(swipe['time'],swipe['I_up_N'],label='SWIPE',c='orange')
+    ax.plot(swipe['time'],swipe['I_up_N'],label='AMPS',c='orange')
 
     ax.text(0.99,0.90,r'$R^2$'+f'={result_north.rsquared:.2f}',
              transform=ax.transAxes,c='magenta',horizontalalignment='right')
@@ -358,11 +358,12 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
                           swipe:dict,**kwargs:dict) -> plt.Axes:
     stations = ['FMC','MEA','T43']
     ampere_path = '../data/ampere/'
-    #ampere_quicklook='1715372880.north.png'
-    ampere_quicklook='1715372880.north_annotated.png'
+    ampere_quicklook='1715372880.north.png'
+    #ampere_quicklook='1715372880.north_annotated.png'
     ampere_image = plt.imread(f"{ampere_path}{ampere_quicklook}")
     paraview_path = '../outputs/vis/'
-    paraview_compare = 'FAC_ampere_compare_annotated.png'
+    paraview_compare = 'FAC_ampere_compare.png'
+    #paraview_compare = 'FAC_ampere_compare_annotated.png'
     paraview_image = plt.imread(f"{paraview_path}{paraview_compare}")
     # Figure
     fig = plt.figure(figsize=[24,32])
@@ -482,7 +483,8 @@ def draw_scatter_panel(ax:plt.Axes,
         #                                bin_Ranges['pHigh_all'],'gold',0.2)
         sc = ax.scatter(X[phase],Y[phase],marker=markers[i],
                         c=scat_color[phase],ec=team_colors[i],
-                            s=50,alpha=0.8,vmin=0,vmax=40,cmap='Grays')
+                        #vmin=0,vmax=40,
+                            s=50,alpha=0.8,cmap='Grays')
         ax.plot(X_bins,bin_Ranges['p50_all'],c=team_colors[i],lw=4)
         ax.plot(X_bins,slope*X_bins+intercept,c=team_colors[i],ls='--',lw=3)
     # Get Pearson r for all data
@@ -610,41 +612,28 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
 
 
     # Figure
-    fig = plt.figure(figsize=[28,30])
+    fig = plt.figure(figsize=[30,24])
     # GridSpecs #TODO reduce whitespace
-    slivers = plt.GridSpec(1,3,hspace=0.1,figure=fig,
-                             left=0.06,right=0.95,bottom=0.04,top=0.98,
-                             width_ratios=[4,56,4],wspace=0.1)
-    eightpack = slivers[1].subgridspec(4,2,hspace=0.2,wspace=0.1)
+    twocolumn = plt.GridSpec(1,2,hspace=0.1,figure=fig,
+                             left=0.06,right=0.95,bottom=0.07,top=0.98,
+                             width_ratios=[4,56],wspace=0.1)
+    fourpack = twocolumn[1].subgridspec(2,2,hspace=0.15,wspace=0.1)
     # Declare axes
-    ax1 = fig.add_subplot(eightpack[0])
-    ax2 = fig.add_subplot(eightpack[1])
-    ax3 = fig.add_subplot(eightpack[2])
-    ax4 = fig.add_subplot(eightpack[3])
-    ax5 = fig.add_subplot(eightpack[4])
-    ax6 = fig.add_subplot(eightpack[5])
-    ax7 = fig.add_subplot(eightpack[6])
-    ax8 = fig.add_subplot(eightpack[7])
+    ax1 = fig.add_subplot(fourpack[0,0])
+    ax2 = fig.add_subplot(fourpack[0,1])
+    ax3 = fig.add_subplot(fourpack[1,0])
+    ax4 = fig.add_subplot(fourpack[1,1])
 
     # Plot
     ax1,scl = draw_scatter_panel(ax1,Esw,K1,pdyn,text_loc='right')
-    ax3,scl = draw_scatter_panel(ax3,K1[K1>0],FAC[K1>0],pdyn[K1>0])
-    ax5,scl = draw_scatter_panel(ax5,FAC,CPCP,pdyn)
-    ax7,scl = draw_scatter_panel(ax7,Ein,CPCP,pdyn)
-
-    ax2,scr = draw_fit_resid_panel(ax2,Ein,K1,pdyn)
-    ax4,scr = draw_fit_resid_panel(ax4,K1[K1>0],FAC[K1>0],pdyn[K1>0])
-    ax6,scr = draw_fit_resid_panel(ax6,FAC,CPCP,pdyn)
-    ax8,scr = draw_fit_resid_panel(ax8,Ein,CPCP,pdyn)
+    ax2,scl = draw_scatter_panel(ax2,K1[K1>0],FAC[K1>0],pdyn[K1>0])
+    ax3,scl = draw_scatter_panel(ax3,FAC,CPCP,pdyn)
+    ax4,scl = draw_scatter_panel(ax4,Ein,CPCP,pdyn)
 
     # Decorate
     cb_axl = fig.add_axes([0.06,.084,.02,.854])
-    #cb_axr = fig.add_axes([0.92,.084,.02,.854])
     cbl = fig.colorbar(scl,orientation='vertical',cax=cb_axl)
-    #cbr = fig.colorbar(scr,orientation='vertical',cax=cb_axr)
-    cbl.set_ticks(np.linspace(0,40,11))
     cbl.set_label(r"$p_{dyn}\left[nPa\right]$",fontsize=36)
-    #cbr.set_label(r"$T-$ 11-01:30:00 $\left[Hr\right]$",fontsize=36)
 
     cb_axl.yaxis.set_ticks_position("left")
     cb_axl.yaxis.set_label_position("left")
@@ -652,46 +641,23 @@ def plot_figure_3(path:str,solarwind:pd.DataFrame,
     ax1.set_xlabel(r"$E_{in}\left[TW\right]$ Wang'14")
     ax1.set_ylabel(K1label())
 
-    ax3.set_xlabel(K1label())
-    ax3.set_ylabel(r'$\int$FAC $\left[MA\right]$')
+    ax2.set_xlabel(K1label())
+    ax2.set_ylabel(r'$\int$FAC $\left[MA\right]$')
 
-    ax5.set_xlabel(r'$\int$FAC $\left[MA\right]$')
-    ax5.set_ylabel(r'CPCP $\left[kV\right]$')
+    ax3.set_xlabel(r'$\int$FAC $\left[MA\right]$')
+    ax3.set_ylabel(r'CPCP $\left[kV\right]$')
 
-    ax7.set_xlabel(r"$E_{in}\left[TW\right]$ Wang'14")
-    ax7.set_ylabel(r'CPCP $\left[kV\right]$')
+    ax4.set_xlabel(r"$E_{in}\left[TW\right]$ Wang'14")
+    ax4.set_ylabel(r'CPCP $\left[kV\right]$')
 
-    ax2.set_xlabel(r'predict. '+K1label())
-    ax2.set_ylabel(r'$E_{in}$ Fit Resid.')
-    ax2.set_ylim([-100,50])
-
-    ax4.set_xlabel(r'predict. $\int$FAC $\left[MA\right]$')
-    ax4.set_ylabel(K1label()+' (sqrt) Fit Resid.')
-
-    ax6.set_xlabel(r'predict. CPCP $\left[kV\right]$')
-    ax6.set_ylabel(r'$FAC$ Fit Resid.')
-
-    ax8.set_xlabel(r'predict. CPCP $\left[kV\right]$')
-    ax8.set_ylabel(r'$E_{in}$ (sqrt) Fit Resid.')
-
-    letters = ['(a)','(e)','(b)','(f)','(c)','(g)','(d)','(h)']
-    for i,ax in enumerate([ax1,ax2,ax3,ax4,ax5,ax6,ax7,ax8]):
-        if i==1 or i==3 or i==5 or i==7:
+    letters = ['(a)','(b)','(c)','(d)']
+    for i,ax in enumerate([ax1,ax2,ax3,ax4]):
+        if i==1 or i==3:
             ax.yaxis.tick_right()
             ax.yaxis.set_label_position("right")
-            if i!=1:
-                #ax.set_ylim([-1,8])
-                #ax.set_ylim([-1,1])
-                pass
-            else:
-                #ax.set_ylim([-5,5])
-                ax.axhline(-1,c='grey',ls='--')
-                ax.axhline(1,c='grey',ls='--')
         ax.text(0.98,0.02,f"{letters[i]}",transform=ax.transAxes,
                 c='black',horizontalalignment='right',fontsize=36)
         ax.grid()
-    #fig.patches.extend([plt.Rectangle([0,0.25],0.23,1,fill=True,fc='plum',
-    #               alpha=0.2,zorder=-1,transform=fig.transFigure,figure=fig)])
 
     # Save
     figurename = f"{path}/figure3.png"
@@ -892,7 +858,8 @@ def draw_general_scatter(ax:plt.Axes,Y:pd.Series,X:pd.Series,
     tstorm = X.index>TMAIN
     trecovery = X.index>TMIN
     phase_name = ['Pre','Storm']
-    team_colors = ['red','blue']
+    team_colors = [kwargs.get('red_shade','red'),
+                   kwargs.get('blue_shade','blue')]
     markers = ['o','o']
     text_X,text_Y = kwargs.get('text_xy',[0.02,0.94])
     text_head = kwargs.get('text_head',r'$R^2$=')
@@ -1046,24 +1013,25 @@ def plot_figure_5(path:str,solarwind:pd.DataFrame,
     t_swipe = [(t-TMIN).total_seconds()*1e9 for t in swipe['time']]
 
     K1  = (mp['K_netK1 [W]']+mp['UtotM1 [W]']).rolling('600s').mean()/-1e12
-    Ein = pd.Series(index=K1.index,
+    Ein = pd.Series(index=K1.index,name='Ein',
                    data=np.interp(t_mp,t_sw,solarwind['EinWang'].values/1e12))
-    Esw = pd.Series(index=K1.index,
+    Esw = pd.Series(index=K1.index,name='Esw',
                      data=np.interp(t_mp,t_sw,solarwind['Esw'].values/1e3))
-    CPCP= pd.Series(index=K1.index,
+    CPCP= pd.Series(index=K1.index,name='CPCP',
                      data=np.interp(t_mp,t_log,swmf_log['cpcpn'].values))
-    FAC  = pd.Series(index=K1.index,data=np.interp(t_mp,t_ie,
-                      (I_swmf['up_north_MA']).values))
-    AMP_FAC = pd.Series(index=K1.index,data=np.interp(t_mp,t_ampere,
+    FAC  = pd.Series(index=K1.index,name='FAC',
+                     data=np.interp(t_mp,t_ie,(I_swmf['up_north_MA']).values))
+    AMP_FAC = pd.Series(index=K1.index,name='AMP_FAC',
+                     data=np.interp(t_mp,t_ampere,
                                     I_ampere['I_total_up_North_[MA]'].values))
     pdyn = np.interp(t_mp,t_sw,solarwind['pdyn'].values)
-    BOYLE   = pd.Series(index=K1.index,
+    BOYLE   = pd.Series(index=K1.index,name='BOYLE',
                        data=np.interp(t_mp,t_sw,solarwind['CPCP_B97'].values))
-    SHILL   = pd.Series(index=K1.index,
+    SHILL   = pd.Series(index=K1.index,name='SHILL',
                        data=np.interp(t_mp,t_sw,solarwind['CPCP_S02'].values))
-    KRID    = pd.Series(index=K1.index,
+    KRID    = pd.Series(index=K1.index,name='KRID',
                        data=np.interp(t_mp,t_sw,solarwind['CPCP_K08'].values))
-    SWIPE = pd.Series(index=K1.index,
+    SWIPE = pd.Series(index=K1.index,name='SWIPE',
                       data=np.interp(t_mp,t_swipe,swipe['cpcp_n']))
     tpre   = FAC.index<TMAIN
     tstorm = FAC.index>TMAIN
@@ -1125,13 +1093,17 @@ def plot_figure_5(path:str,solarwind:pd.DataFrame,
     draw_dmsp_sparse(ax_dmsp_Esw,dmsp_sparse,Esw)
     draw_dmsp_sparse(ax_dmsp_ampere,dmsp_sparse,AMP_FAC)
     draw_general_scatter(ax_empirical_Esw,BOYLE,Esw,'black','Boyle',
-                         text_head='',text_xy=[0.02,.89])
+                         text_head='',text_xy=[0.02,.89],
+                         red_shade='darkred',blue_shade='darkblue')
     draw_general_scatter(ax_empirical_ampere,BOYLE,AMP_FAC,'black','Boyle',
-                         text_head='',text_xy=[0.02,.89])
+                         text_head='',text_xy=[0.02,.89],
+                         red_shade='darkred',blue_shade='darkblue')
     draw_general_scatter(ax_empirical_Esw,SWIPE,Esw,'white','SWIPE',
-                         text_head='',text_xy=[0.12,.89])
+                         text_head='',text_xy=[0.12,.89],
+                         red_shade='lightcoral',blue_shade='cornflowerblue')
     draw_general_scatter(ax_empirical_ampere,SWIPE,AMP_FAC,'white','SWIPE',
-                         text_head='',text_xy=[0.12,.89])
+                         text_head='',text_xy=[0.12,.89],
+                         red_shade='lightcoral',blue_shade='cornflowerblue')
 
     # Decorate
     label_tag = ['SWMF','DMSP','Empirical']
@@ -1274,7 +1246,7 @@ def main() -> None:
         all_data = pd.concat([all_data,df])
     all_data = all_data.replace(9999.00,np.nan)
     dataset['ampere'] = all_data
-    I_ampere = dataset['ampere']
+    I_ampere = dataset['ampere'].sort_index()
 
     ## DMSP
     dmsp = {}
@@ -1286,10 +1258,10 @@ def main() -> None:
     swipe = dict(np.load("../data/swipe/swipe_cpcp.npz"))
 
     ## Create Figures
-    #plot_figure_1(unfiled,solarwind,swmf_log,mp,omni)
-    #plot_figure_2(unfiled,sats,vsats,vmagnets,
-    #              I_ampere,I_swmf,pc,swmf_log,dmsp,ie,swipe)
-    #plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
+    plot_figure_1(unfiled,solarwind,swmf_log,mp,omni)
+    plot_figure_2(unfiled,sats,vsats,vmagnets,
+                  I_ampere,I_swmf,pc,swmf_log,dmsp,ie,swipe)
+    plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     #plot_figure_4(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     plot_figure_5(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log,dmsp,ie,swipe)
 
