@@ -110,15 +110,20 @@ def draw_plasma_panel(ax:plt.Axes,solarwind:pd.DataFrame,mp:pd.DataFrame,
 
 def draw_Esw_panel(ax:plt.Axes,
             solarwind:pd.DataFrame,
-                   mp:pd.DataFrame,**kwargs:dict) -> plt.Axes:
+                   mp:pd.DataFrame,ie:dict,**kwargs:dict) -> plt.Axes:
     K1     = (mp['K_netK1 [W]']+mp['UtotM1 [W]'])/-1e12
     K1_ave = (mp['K_netK1 [W]']+mp['UtotM1 [W]']).rolling('600s').mean()/-1e12
+    JH_N = np.sum(ie['N']['JouleHeat [mW/m^2]']*
+                  ie['N']['Area [Re^2]']*6.371**2*1e-3,axis=1)
+    JH_S = np.sum(ie['S']['JouleHeat [mW/m^2]']*
+                  ie['S']['Area [Re^2]']*6.371**2*1e-3,axis=1)
     ax.plot(solarwind.index,solarwind['Esw']/1e3,label=r'$E_{KL}$',
             c='black',lw=4)
     ax.fill_between(solarwind.index,solarwind['EinWang']/1e12,
                     label='$E_{in}$',fc='grey')
     #ax.plot(mp.index,K1,c='plum',label='_K1raw',alpha=0.8)
     ax.plot(mp.index,K1_ave,c='magenta',label=K1label())
+    ax.plot(ie['N']['time'],JH_N+JH_S,c='goldenrod',label='Joule Heating')
     return ax
 
 def draw_dst_panel(ax:plt.Axes,swmf_log:pd.DataFrame,
@@ -130,6 +135,7 @@ def draw_dst_panel(ax:plt.Axes,swmf_log:pd.DataFrame,
 def plot_figure_1(path:str,solarwind:pd.DataFrame,
                             swmf_log:pd.DataFrame,
                                   mp:pd.DataFrame,
+                                  ie:dict,
                                 omni:pd.DataFrame,**kwargs:dict) -> plt.Axes:
     # Figure
     fig,axes = plt.subplots(4,figsize=[24,32],sharex=True)
@@ -139,7 +145,7 @@ def plot_figure_1(path:str,solarwind:pd.DataFrame,
         ax.axvspan(TMAIN,TEND,fc='blue',alpha=0.1)
     axes[0] = draw_imf_panel(axes[0],solarwind)
     axes[1] = draw_plasma_panel(axes[1],solarwind,mp)
-    axes[2] = draw_Esw_panel(axes[2],solarwind,mp)
+    axes[2] = draw_Esw_panel(axes[2],solarwind,mp,ie)
     axes[3] = draw_dst_panel(axes[3],swmf_log,omni)
     # Decorate
     general_plot_settings(axes[0],do_xlabel=False,legend=True,
@@ -913,9 +919,10 @@ def draw_swmf_sparse(ax:plt.Axes,CPCP:pd.Series,dmsp:dict,X:pd.Series) -> None:
     for i,sat in enumerate(['F16_N','F17_N','F18_N']):
         if i==0: satlabel='vDMSP Pass'
         else: satlabel='_nolabel'
-        times = np.array(dmsp[sat]['time'])
-        tstarts = np.array(dmsp[sat]['tstart'])
-        tends = np.array(dmsp[sat]['tend'])
+        clean = np.array([not b for b in np.isnan(dmsp[sat]['cpcp_kV'])])
+        times = np.array(dmsp[sat]['time'][clean])
+        tstarts = np.array(dmsp[sat]['tstart'][clean])
+        tends = np.array(dmsp[sat]['tend'][clean])
 
         pre   = (times>=X.index[0]) & (times<TMAIN)
         storm = (times>=TMAIN)      & (times<X.index[-1])
@@ -926,6 +933,8 @@ def draw_swmf_sparse(ax:plt.Axes,CPCP:pd.Series,dmsp:dict,X:pd.Series) -> None:
             X_sparse_pre[i,0] = X[interv].mean()
             X_sparse_pre[i,1] = X[interv].mean()-X[interv].quantile(0.25)
             X_sparse_pre[i,2] = X[interv].quantile(0.75)-X[interv].mean()
+            #X_sparse_pre[i,1] = X[interv].std()
+            #X_sparse_pre[i,2] = X[interv].std()
         err_pre = np.array([z for z in zip(X_sparse_pre[:,1],
                                            X_sparse_pre[:,2])]).T
 
@@ -935,17 +944,20 @@ def draw_swmf_sparse(ax:plt.Axes,CPCP:pd.Series,dmsp:dict,X:pd.Series) -> None:
             X_sparse_storm[i,0] = X[interv].mean()
             X_sparse_storm[i,1] = X[interv].mean()-X[interv].quantile(0.25)
             X_sparse_storm[i,2] = X[interv].quantile(0.75)-X[interv].mean()
+            #X_sparse_storm[i,1] = X[interv].std()
+            #X_sparse_storm[i,2] = X[interv].std()
         err_storm = np.array([z for z in zip(X_sparse_storm[:,1],
                                              X_sparse_storm[:,2])]).T
 
-        ax.scatter(X_sparse_pre[:,0],dmsp[sat]['ie_cpcp'][pre],ec='red',
+        ax.scatter(X_sparse_pre[:,0],dmsp[sat]['ie_cpcp'][clean][pre],ec='red',
                    alpha=0.8,label=satlabel+' Pre',s=200,c='black')
-        ax.scatter(X_sparse_storm[:,0],dmsp[sat]['ie_cpcp'][storm],ec='blue',
+        ax.scatter(X_sparse_storm[:,0],dmsp[sat]['ie_cpcp'][clean][storm],
+                   ec='blue',
                    label=satlabel+' Storm',s=200,c='black',alpha=0.8)
 
-        ax.errorbar(X_sparse_pre[:,0],dmsp[sat]['ie_cpcp'][pre],
+        ax.errorbar(X_sparse_pre[:,0],dmsp[sat]['ie_cpcp'][clean][pre],
                     xerr=err_pre,fmt='none',ecolor='black')
-        ax.errorbar(X_sparse_storm[:,0],dmsp[sat]['ie_cpcp'][storm],
+        ax.errorbar(X_sparse_storm[:,0],dmsp[sat]['ie_cpcp'][clean][storm],
                     xerr=err_storm,fmt='none',ecolor='black')
 
     return
@@ -1258,10 +1270,10 @@ def main() -> None:
     swipe = dict(np.load("../data/swipe/swipe_cpcp.npz"))
 
     ## Create Figures
-    plot_figure_1(unfiled,solarwind,swmf_log,mp,omni)
-    plot_figure_2(unfiled,sats,vsats,vmagnets,
-                  I_ampere,I_swmf,pc,swmf_log,dmsp,ie,swipe)
-    plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
+    #plot_figure_1(unfiled,solarwind,swmf_log,mp,ie,omni)
+    #plot_figure_2(unfiled,sats,vsats,vmagnets,
+    #              I_ampere,I_swmf,pc,swmf_log,dmsp,ie,swipe)
+    #plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     #plot_figure_4(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     plot_figure_5(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log,dmsp,ie,swipe)
 
