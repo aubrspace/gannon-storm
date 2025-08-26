@@ -11,6 +11,7 @@ import pandas as pd
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 from matplotlib import cm
+from matplotlib import patches
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from cmcrameri import cm as cm2
 from tqdm import tqdm
@@ -187,7 +188,7 @@ def plot_figure_1(path:str,solarwind:pd.DataFrame,
 
 def draw_vsat_panel(ax:plt.Axes,sats:pd.DataFrame,
                     vsats:pd.DataFrame,**kwargs:dict) -> plt.Axes:
-    goes  =  sats['goes16']
+    #goes  =  sats['goes16']
     vgoes = vsats['goes16']
     rax = ax.twinx()
     rax.plot(vgoes.index,vgoes['theta1'],label=r'Foot Lat.',c='grey',ls='--')
@@ -198,7 +199,7 @@ def draw_vsat_panel(ax:plt.Axes,sats:pd.DataFrame,
     rax.spines['right'].set_color('grey')
     rax.tick_params(axis='y',colors='grey')
 
-    ax.plot(goes.index,goes['bz_gsm'],c='black',lw=2,label='GOES16')
+    #ax.plot(goes.index,goes['bz_gsm'],c='black',lw=2,label='GOES16')
     ax.plot(vgoes.index,vgoes['Bz'],c='deepskyblue',lw=4,label='SWMF')
     ax.axhline(0,c='grey',lw=4)
     return ax
@@ -353,6 +354,43 @@ def draw_swmf_south_tseries(axis:plt.Axes,dmsp:dict,swmf:dict) -> None:
                  label='_swmfF18',color='dimgrey',s=150,marker='o')
     return
 
+def dual_half_circle(center:[float,float],
+                     radius:float,
+                      angle:int=90,
+                         ax:plt.Axes=None,
+                     colors:[str,str]=('black','white'),
+                   **kwargs:dict) -> [patches.Wedge,patches.Wedge]:
+    """
+    Add two half circles to the axes *ax* (or the current axes) with the
+    specified facecolors *colors* rotated at *angle* (in degrees).
+    """
+    if ax is None:
+        ax = plt.gca()
+    theta1, theta2 = angle, angle + 180
+    w1 = patches.Wedge(center, radius, theta1, theta2, ec=colors[0],
+                       fc=colors[0], **kwargs)
+    w2 = patches.Wedge(center, radius, theta2, theta1, ec=colors[0],
+                       fc=colors[1], **kwargs)
+    for wedge in [w1, w2]:
+        ax.add_artist(wedge)
+    return [w1, w2]
+
+def draw_orbits(axis:plt.Axes,sats:dict,vsats:dict) -> None:
+    sheath = vsats['goes16']['Bz']<0
+    axis.scatter(vsats['goes16']['X'],vsats['goes16']['Y'],
+                 c='deepskyblue')
+    axis.scatter(vsats['goes16']['X'][sheath],vsats['goes16']['Y'][sheath],
+                 c='red')
+    #c=vsats['goes16']['Bz'],cmap='managua')
+    #axis.scatter(vsats['themisB']['X'],vsats['themisB']['Y'],
+    #             c='orange')
+    axis.axvline(32,c='black',lw=1.5)
+    axis.text(30,-15,'SWMF\nUpstream',c='black',fontsize=18)
+    dual_half_circle((0,0),1,ax=axis)
+    axis.set_xlim(40,-10)
+    axis.set_ylim(20,-20)
+    axis.grid()
+
 def plot_figure_2(path:str,sats:pd.DataFrame,
                           vsats:pd.DataFrame,
                        vmagnets:pd.DataFrame,
@@ -375,14 +413,16 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
     fig = plt.figure(figsize=[24,32])
     # GridSpecs #TODO reduce whitespace
     fivepiece = plt.GridSpec(4,1,hspace=0.1,figure=fig,
-                             left=0.09,right=0.95,bottom=0.04,top=0.98,
+                             left=0.09,right=0.92,bottom=0.04,top=0.98,
                              height_ratios=[1,2,0.7,1.3])
     middleSection = fivepiece[1].subgridspec(1,2,hspace=0.1,wspace=0.01,
                                              width_ratios=[3,1])
+    satPanels = fivepiece[0].subgridspec(1,2,wspace=0.15,width_ratios=[3,1])
     magPanels = middleSection[0].subgridspec(3,1,hspace=0.05)
     polarPanels = middleSection[1].subgridspec(2,1,hspace=0.01)
     # Declare axes
-    sat_ax = fig.add_subplot(fivepiece[0])
+    sat_ax = fig.add_subplot(satPanels[0])
+    orbit_ax = fig.add_subplot(satPanels[1])
     mag_ax1 = fig.add_subplot(magPanels[0])
     mag_ax2 = fig.add_subplot(magPanels[1])
     mag_ax3 = fig.add_subplot(magPanels[2])
@@ -392,6 +432,7 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
     cpcp_ax = fig.add_subplot(fivepiece[3])
     # Plot
     sat_ax  = draw_vsat_panel(sat_ax,sats,vsats)
+    draw_orbits(orbit_ax,sats,vsats)
     mag_ax1 = draw_magnetometer_panel(mag_ax1,vmagnets,stations[0])
     mag_ax2 = draw_magnetometer_panel(mag_ax2,vmagnets,stations[1])
     mag_ax3 = draw_magnetometer_panel(mag_ax3,vmagnets,stations[2])
@@ -409,9 +450,16 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
     general_plot_settings(sat_ax,do_xlabel=False,legend=True,
                           legend_loc='lower left',
                           ylabel=r'$B_Z\left[nT\right]$',
-                          xlim=[TINIT,TEND],timedelta=False)
+                          xlim=[TINIT,TCUT-dt.timedelta(minutes=80)],
+                          timedelta=False)
     sat_ax.text(0.99,0.2,f"(a)",transform=sat_ax.transAxes,
                   c='black',horizontalalignment='right',fontsize=36)
+    orbit_ax.set_xlabel('X GSM [R]')
+    orbit_ax.xaxis.tick_top()
+    #orbit_ax.xaxis.set_label_position("top")
+    orbit_ax.set_ylabel('Y GSM [R]')
+    orbit_ax.yaxis.tick_right()
+    orbit_ax.yaxis.set_label_position("right")
     letters = ['(b)','(c)','(d)']
     for i,ax in enumerate([mag_ax1,mag_ax2,mag_ax3]):
         general_plot_settings(ax,do_xlabel=False,legend=False,
@@ -1229,6 +1277,7 @@ def main() -> None:
     sats = {}
     # GOES16
     goes_hardcopy = '../data/sat/goes_hardcopy.csv'
+    '''
     if os.path.exists(goes_hardcopy):
         print(f'{goes_hardcopy} found ...')
         goes_df = pd.read_csv(goes_hardcopy,index_col='time')
@@ -1239,9 +1288,12 @@ def main() -> None:
                                                probes=['16'],writeData=False)
         goes_df = goes_b['goes16']
         goes_df.index.name = 'time'
+        #TODO interp position to the mag cadence and add to the dict
+        from IPython import embed; embed()
         goes_df.to_csv(goes_hardcopy)
     for key,df in goes_b.items():
         sats[key] = df
+    '''
     ## Virtual satellite data
     vsatfiles = glob.glob(f'{inSats}*.sat')
     dataset['vsats'] = simdata_to_df(vsatfiles)
@@ -1271,11 +1323,11 @@ def main() -> None:
 
     ## Create Figures
     #plot_figure_1(unfiled,solarwind,swmf_log,mp,ie,omni)
-    #plot_figure_2(unfiled,sats,vsats,vmagnets,
-    #              I_ampere,I_swmf,pc,swmf_log,dmsp,ie,swipe)
+    plot_figure_2(unfiled,sats,vsats,vmagnets,
+                  I_ampere,I_swmf,pc,swmf_log,dmsp,ie,swipe)
     #plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     #plot_figure_4(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
-    plot_figure_5(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log,dmsp,ie,swipe)
+    #plot_figure_5(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log,dmsp,ie,swipe)
 
 
 if __name__ == "__main__":
