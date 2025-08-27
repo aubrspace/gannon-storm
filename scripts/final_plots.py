@@ -188,7 +188,7 @@ def plot_figure_1(path:str,solarwind:pd.DataFrame,
 
 def draw_vsat_panel(ax:plt.Axes,sats:pd.DataFrame,
                     vsats:pd.DataFrame,**kwargs:dict) -> plt.Axes:
-    #goes  =  sats['goes16']
+    goes  =  sats['goes16']
     vgoes = vsats['goes16']
     rax = ax.twinx()
     rax.plot(vgoes.index,vgoes['theta1'],label=r'Foot Lat.',c='grey',ls='--')
@@ -199,7 +199,7 @@ def draw_vsat_panel(ax:plt.Axes,sats:pd.DataFrame,
     rax.spines['right'].set_color('grey')
     rax.tick_params(axis='y',colors='grey')
 
-    #ax.plot(goes.index,goes['bz_gsm'],c='black',lw=2,label='GOES16')
+    ax.plot(goes.index,goes['bz_gsm'],c='black',lw=2,label='GOES16')
     ax.plot(vgoes.index,vgoes['Bz'],c='deepskyblue',lw=4,label='SWMF')
     ax.axhline(0,c='grey',lw=4)
     return ax
@@ -376,19 +376,23 @@ def dual_half_circle(center:[float,float],
     return [w1, w2]
 
 def draw_orbits(axis:plt.Axes,sats:dict,vsats:dict) -> None:
-    sheath = vsats['goes16']['Bz']<0
-    axis.scatter(vsats['goes16']['X'],vsats['goes16']['Y'],
-                 c='deepskyblue')
-    axis.scatter(vsats['goes16']['X'][sheath],vsats['goes16']['Y'][sheath],
-                 c='red')
-    #c=vsats['goes16']['Bz'],cmap='managua')
-    #axis.scatter(vsats['themisB']['X'],vsats['themisB']['Y'],
-    #             c='orange')
+    goes = vsats['goes16'][(vsats['goes16'].index>TINIT)&
+                           (vsats['goes16'].index<TEND)]
+    themis = sats['themisB'][(sats['themisB'].index>TINIT)&
+                             (sats['themisB'].index<TEND)]
+    sheath = goes['Bz']<0
+    axis.scatter(goes['X'],goes['Y'],c='deepskyblue')
+    axis.scatter(goes['X'][sheath],goes['Y'][sheath],c='red')
+    axis.scatter(themis['x_gsm'],themis['y_gsm'],c='orange')
     axis.axvline(32,c='black',lw=1.5)
     axis.text(30,-15,'SWMF\nUpstream',c='black',fontsize=18)
+    axis.text(15,15,'GOES',c='deepskyblue',fontsize=18)
+    axis.text(15,20,'(Bz<0)',c='red',fontsize=18)
+    axis.text(50,50,'THEMIS B',c='orange',fontsize=18)
+    axis.text(-10,55,'(b)',c='black',fontsize=36)
     dual_half_circle((0,0),1,ax=axis)
-    axis.set_xlim(40,-10)
-    axis.set_ylim(20,-20)
+    axis.set_xlim(55,-10)
+    axis.set_ylim(55,-25)
     axis.grid()
 
 def plot_figure_2(path:str,sats:pd.DataFrame,
@@ -402,12 +406,12 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
                           swipe:dict,**kwargs:dict) -> plt.Axes:
     stations = ['FMC','MEA','T43']
     ampere_path = '../data/ampere/'
-    ampere_quicklook='1715372880.north.png'
-    #ampere_quicklook='1715372880.north_annotated.png'
+    #ampere_quicklook='1715372880.north.png'
+    ampere_quicklook='1715372880.north_annotated.png'
     ampere_image = plt.imread(f"{ampere_path}{ampere_quicklook}")
     paraview_path = '../outputs/vis/'
-    paraview_compare = 'FAC_ampere_compare.png'
-    #paraview_compare = 'FAC_ampere_compare_annotated.png'
+    #paraview_compare = 'FAC_ampere_compare.png'
+    paraview_compare = 'FAC_ampere_compare_annotated.png'
     paraview_image = plt.imread(f"{paraview_path}{paraview_compare}")
     # Figure
     fig = plt.figure(figsize=[24,32])
@@ -460,7 +464,7 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
     orbit_ax.set_ylabel('Y GSM [R]')
     orbit_ax.yaxis.tick_right()
     orbit_ax.yaxis.set_label_position("right")
-    letters = ['(b)','(c)','(d)']
+    letters = ['(c)','(d)','(e)']
     for i,ax in enumerate([mag_ax1,mag_ax2,mag_ax3]):
         general_plot_settings(ax,do_xlabel=False,legend=False,
                               ylabel=f'{stations[i]}',
@@ -475,24 +479,24 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
     pole_ax1.axis('off')
     pole_ax1.text(0.98,0.98,f"05-10 20:30:00",transform=pole_ax1.transAxes,
                   c='grey',horizontalalignment='right',fontsize=24)
-    pole_ax1.text(0.98,0.02,f"(e)",transform=pole_ax1.transAxes,
+    pole_ax1.text(0.98,0.02,f"(f)",transform=pole_ax1.transAxes,
                   c='black',horizontalalignment='right',fontsize=36)
     pole_ax2.axis('off')
-    pole_ax2.text(0.98,0.02,f"(f)",transform=pole_ax2.transAxes,
+    pole_ax2.text(0.98,0.02,f"(g)",transform=pole_ax2.transAxes,
                   c='black',horizontalalignment='right',fontsize=36)
     general_plot_settings(fac_ax,do_xlabel=False,legend=True,
                           legend_loc='upper left',ylim=[0,40],
                           ylabel=r'$\int$FAC $\left[MA\right]$',
                           xlim=[TINIT,TEND], timdelta=False)
     fac_ax.set_xticklabels([])
-    fac_ax.text(0.98,0.02,f"(g)",transform=fac_ax.transAxes,
+    fac_ax.text(0.98,0.02,f"(h)",transform=fac_ax.transAxes,
                   c='black',horizontalalignment='right',fontsize=36)
     general_plot_settings(cpcp_ax,do_xlabel=True,legend=False,
                           xlim=[TINIT,TEND],ylim=[0,1150],
                           ylabel=r'CPCP $\left[kV\right]$',timedelta=False)
     cpcp_ax.legend(loc='lower right', bbox_to_anchor=(1.0, 0.60),
                    ncol=2, fancybox=True, shadow=True)
-    cpcp_ax.text(0.98,0.02,f"(h)",transform=cpcp_ax.transAxes,
+    cpcp_ax.text(0.98,0.02,f"(i)",transform=cpcp_ax.transAxes,
                   c='black',horizontalalignment='right',fontsize=36)
     for ax in [sat_ax,mag_ax1,mag_ax2,mag_ax3,fac_ax,cpcp_ax]:
         ax.margins(x=0.01)
@@ -1277,7 +1281,6 @@ def main() -> None:
     sats = {}
     # GOES16
     goes_hardcopy = '../data/sat/goes_hardcopy.csv'
-    '''
     if os.path.exists(goes_hardcopy):
         print(f'{goes_hardcopy} found ...')
         goes_df = pd.read_csv(goes_hardcopy,index_col='time')
@@ -1288,12 +1291,12 @@ def main() -> None:
                                                probes=['16'],writeData=False)
         goes_df = goes_b['goes16']
         goes_df.index.name = 'time'
-        #TODO interp position to the mag cadence and add to the dict
-        from IPython import embed; embed()
         goes_df.to_csv(goes_hardcopy)
     for key,df in goes_b.items():
         sats[key] = df
-    '''
+    # THEMIS
+    with pd.HDFStore(inSats+'themis_pos.h5') as store:
+        sats['themisB'] = store['/themisB']
     ## Virtual satellite data
     vsatfiles = glob.glob(f'{inSats}*.sat')
     dataset['vsats'] = simdata_to_df(vsatfiles)
