@@ -96,7 +96,7 @@ def draw_plasma_panel(ax:plt.Axes,solarwind:pd.DataFrame,mp:pd.DataFrame,
             c='black',ls='--',lw=3)
     rax = ax.twinx()
     rax.plot(solarwind.index,solarwind['density'],
-             label=r'n $\left[\#/cc\right]$',c='goldenrod')
+             label=r'n $\left[\#/cc\right]$',c='goldenrod',lw=4)
     rax.plot(solarwind.index,solarwind['pdyn'],
              label=r'$P_{dyn}\left[nPa\right]$',c='red')
     rax.plot(solarwind.index,solarwind['Ma'],label=r'$M_A$',
@@ -112,25 +112,34 @@ def draw_plasma_panel(ax:plt.Axes,solarwind:pd.DataFrame,mp:pd.DataFrame,
 def draw_Esw_panel(ax:plt.Axes,
             solarwind:pd.DataFrame,
                    mp:pd.DataFrame,ie:dict,**kwargs:dict) -> plt.Axes:
+    # MP input energy flux
     K1     = (mp['K_netK1 [W]']+mp['UtotM1 [W]'])/-1e12
     K1_ave = (mp['K_netK1 [W]']+mp['UtotM1 [W]']).rolling('600s').mean()/-1e12
+
+    # Joule Heating
     JH_N = np.sum(ie['N']['JouleHeat [mW/m^2]']*
                   ie['N']['Area [Re^2]']*6.371**2*1e-3,axis=1)
     JH_S = np.sum(ie['S']['JouleHeat [mW/m^2]']*
                   ie['S']['Area [Re^2]']*6.371**2*1e-3,axis=1)
+    #TODO - hemispheric power doesnt make sense... NOTE skipping fo now
+    HP_N = np.sum(ie['N']['E-Flux [W/m^2]']*ie['N']['Area [Re^2]']*6.371**2,
+                  axis=1)
+    HP_S = np.sum(ie['S']['E-Flux [W/m^2]']*ie['S']['Area [Re^2]']*6.371**2,
+                  axis=1)
+
     ax.plot(solarwind.index,solarwind['Esw']/1e3,label=r'$E_{KL}$',
             c='black',lw=4)
     ax.fill_between(solarwind.index,solarwind['EinWang']/1e12,
                     label='$E_{in}$',fc='grey')
-    #ax.plot(mp.index,K1,c='plum',label='_K1raw',alpha=0.8)
     ax.plot(mp.index,K1_ave,c='magenta',label=K1label())
-    ax.plot(ie['N']['time'],JH_N+JH_S,c='goldenrod',label='Joule Heating')
+    ax.plot(ie['N']['time'],JH_N+JH_S,c='goldenrod',label='Joule Heating',
+            lw=5)
     return ax
 
 def draw_dst_panel(ax:plt.Axes,swmf_log:pd.DataFrame,
                    omni:pd.DataFrame,**kwargs:dict) -> plt.Axes:
-    ax.plot(omni.index,omni['sym_h'],label='OMNI',c='black',lw=3)
-    ax.plot(swmf_log.index,swmf_log['dst_sm'],label='SWMF',c='magenta',lw=1.5)
+    ax.plot(omni.index,omni['sym_h'],label='OMNI',c='black',lw=4)
+    ax.plot(swmf_log.index,swmf_log['dst_sm'],label='SWMF',c='magenta',lw=3)
     return ax
 
 def plot_figure_1(path:str,solarwind:pd.DataFrame,
@@ -164,6 +173,7 @@ def plot_figure_1(path:str,solarwind:pd.DataFrame,
     general_plot_settings(axes[3],do_xlabel=True,legend=True,
                           ylabel=r'SYM-H $\left[nT\right]$',
                           xlim=[TINIT,TEND],timedelta=False)
+    axes[-1].set_xlabel('Time [dy-hr]')
     axes[0].text(0.01,0.02,f"(a)",transform=axes[0].transAxes,
                   c='black',horizontalalignment='left',fontsize=36)
     axes[1].text(0.15,0.93,f"(b)",transform=axes[1].transAxes,
@@ -202,6 +212,15 @@ def draw_vsat_panel(ax:plt.Axes,sats:pd.DataFrame,
     ax.plot(goes.index,goes['bz_gsm'],c='black',lw=2,label='GOES16')
     ax.plot(vgoes.index,vgoes['Bz'],c='deepskyblue',lw=4,label='SWMF')
     ax.axhline(0,c='grey',lw=4)
+    # add vertical lines for when the spacecraft is on the dayside
+    clock = 12+np.arctan2(vgoes['Y'],vgoes['X'])*12/np.pi
+    nine = abs(clock-9)<0.001
+    fifteen = abs(clock-15)<0.001
+    ax.axvline(clock[nine].index[0],c='goldenrod',lw=3)
+    ax.axvline(clock[fifteen].index[0],c='goldenrod',lw=3)
+    ax.text(clock[nine].index[0],220,f"09",c='goldenrod',fontsize=24,ha='right')
+    ax.text(clock[fifteen].index[0],220,f"15",c='goldenrod',fontsize=24,
+            ha='right')
     return ax
 
 def draw_magnetometer_panel(ax:plt.Axes,vmagnets:pd.DataFrame,
@@ -324,11 +343,11 @@ def draw_swmf_north_tseries(axis:plt.Axes,dmsp:dict,swmf:dict) -> None:
     axis.fill_between(swmf['time'],cpcp,label='SWMF CPCP',
                       ec='grey',fc='lightgrey')
     axis.plot(dmsp['F16_N']['time'],dmsp['F16_N']['ie_cpcp'],
-                 label='SWMF F16',color='orange',ls='--')
+                 label='SWMF F16',color='orange',ls='--',lw=4)
     axis.plot(dmsp['F17_N']['time'],dmsp['F17_N']['ie_cpcp'],
-                 label='SWMF F17',color='purple',ls='--')
+                 label='SWMF F17',color='purple',ls='--',lw=4)
     axis.plot(dmsp['F18_N']['time'],dmsp['F18_N']['ie_cpcp'],
-                 label='SWMF F18',color='dimgrey',ls='--')
+                 label='SWMF F18',color='dimgrey',ls='--',lw=4)
     axis.scatter(dmsp['F16_N']['time'],dmsp['F16_N']['ie_cpcp'],
                  label='_swmfF16',color='orange',s=150,marker='o')
     axis.scatter(dmsp['F17_N']['time'],dmsp['F17_N']['ie_cpcp'],
@@ -375,12 +394,30 @@ def dual_half_circle(center:[float,float],
         ax.add_artist(wedge)
     return [w1, w2]
 
-def draw_orbits(axis:plt.Axes,sats:dict,vsats:dict) -> None:
+def draw_orbits(axis:plt.Axes,
+                sats:dict,vsats:dict,
+           solarwind:pd.DataFrame) -> None:
+    # Get the Shue magnetopause at its most compressed
+    sw_min = solarwind.iloc[solarwind['r_shue98'].argmin()]
+    sw_max = solarwind.iloc[solarwind['r_shue98'].argmax()]
+    zenith = np.linspace(160,0,100)*np.pi/180
+    r_shue_min = sw_min['r_shue98']*(2/(1+cos(zenith)))**sw_min['alpha']
+    X_shue_min = r_shue_min*cos(zenith)
+    Y_shue_min = r_shue_min*sin(zenith)
+    r_shue_max = sw_max['r_shue98']*(2/(1+cos(zenith)))**sw_max['alpha']
+    X_shue_max = r_shue_max*cos(zenith)
+    Y_shue_max = r_shue_max*sin(zenith)
+    Y_low = np.interp(X_shue_max,X_shue_min,Y_shue_min)
+    # Get the portions of the orbits that are shown in other axes
     goes = vsats['goes16'][(vsats['goes16'].index>TINIT)&
                            (vsats['goes16'].index<TEND)]
     themis = sats['themisB'][(sats['themisB'].index>TINIT)&
                              (sats['themisB'].index<TEND)]
+    # highlight negative Bz as red
     sheath = goes['Bz']<0
+    # Draw
+    axis.fill_between(X_shue_max,Y_low,Y_shue_max,fc='grey',alpha=0.6)
+    axis.fill_between(X_shue_max,-Y_low,-Y_shue_max,fc='grey',alpha=0.6)
     axis.scatter(goes['X'],goes['Y'],c='deepskyblue')
     axis.scatter(goes['X'][sheath],goes['Y'][sheath],c='red')
     axis.scatter(themis['x_gsm'],themis['y_gsm'],c='orange')
@@ -390,12 +427,17 @@ def draw_orbits(axis:plt.Axes,sats:dict,vsats:dict) -> None:
     axis.text(15,20,'(Bz<0)',c='red',fontsize=18)
     axis.text(50,50,'THEMIS B',c='orange',fontsize=18)
     axis.text(-10,55,'(b)',c='black',fontsize=36)
+    # Add Earth
     dual_half_circle((0,0),1,ax=axis)
+    # Simple decorations
     axis.set_xlim(55,-10)
     axis.set_ylim(55,-25)
     axis.grid()
+    return
 
-def plot_figure_2(path:str,sats:pd.DataFrame,
+def plot_figure_2(path:str,mp:pd.DataFrame,
+                    solarwind:pd.DataFrame,
+                           sats:pd.DataFrame,
                           vsats:pd.DataFrame,
                        vmagnets:pd.DataFrame,
                        I_ampere:pd.DataFrame,
@@ -404,7 +446,19 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
                        swmf_log:pd.DataFrame,
                            dmsp:dict,ie:dict,
                           swipe:dict,**kwargs:dict) -> plt.Axes:
+    t_sw = [float(t.to_numpy()) for t in solarwind.index-TMIN]
+    t_mp = [float(t.to_numpy()) for t in mp.index-TMIN]
+    v = np.interp(t_mp,t_sw,solarwind['v'])
+    B = np.interp(t_mp,t_sw,solarwind['B'])
+    Ma = np.interp(t_mp,t_sw,solarwind['Ma'])
+    clock = np.interp(t_mp,t_sw,np.arccos(solarwind['bz']/solarwind['B']))
+    Rms = mp['X_subsolar [Re]']
+    R05 = (1e-4*v**2 + 11.7*B*(1-np.exp(-Ma/3))*abs(np.sin(clock/2)**3))*Rms/9
+
     stations = ['FMC','MEA','T43']
+    station_titles = [r'FMC $\left(64.3^{\circ}\right)$',
+                      r'MEA $\left(61.9^{\circ}\right)$',
+                      r'T43 $\left(57.9^{\circ}\right)$']
     ampere_path = '../data/ampere/'
     #ampere_quicklook='1715372880.north.png'
     ampere_quicklook='1715372880.north_annotated.png'
@@ -436,20 +490,19 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
     cpcp_ax = fig.add_subplot(fivepiece[3])
     # Plot
     sat_ax  = draw_vsat_panel(sat_ax,sats,vsats)
-    draw_orbits(orbit_ax,sats,vsats)
+    draw_orbits(orbit_ax,sats,vsats,solarwind)
     mag_ax1 = draw_magnetometer_panel(mag_ax1,vmagnets,stations[0])
     mag_ax2 = draw_magnetometer_panel(mag_ax2,vmagnets,stations[1])
     mag_ax3 = draw_magnetometer_panel(mag_ax3,vmagnets,stations[2])
     pole_ax1.imshow(ampere_image)
     pole_ax2.imshow(paraview_image)
     fac_ax  = draw_FAC_panel(fac_ax,I_ampere,I_swmf,swipe)
-    #cpcp_ax = draw_CPCP_panel(cpcp_ax,pc,swmf_log)
     draw_swmf_north_tseries(cpcp_ax,dmsp,ie['N'])
-    #draw_swmf_south_tseries(cpcp_ax,dmsp,ie['S'])
     draw_dmsp_north_tseries(cpcp_ax,dmsp)
-    #draw_dmsp_south_tseries(cpcp_ax,dmsp)
     draw_swipe_north_tseries(cpcp_ax,swipe)
-    #draw_swipe_south_tseries(cpcp_ax,swipe)
+    #NOTE had this added, but the plots already waay too busy...
+    #cpcp_ax.plot(R05.index,R05,c='magenta',label='Ridley 2005')
+
     # Decorate
     general_plot_settings(sat_ax,do_xlabel=False,legend=True,
                           legend_loc='lower left',
@@ -467,7 +520,7 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
     letters = ['(c)','(d)','(e)']
     for i,ax in enumerate([mag_ax1,mag_ax2,mag_ax3]):
         general_plot_settings(ax,do_xlabel=False,legend=False,
-                              ylabel=f'{stations[i]}',
+                              ylabel=f'{station_titles[i]}',
                               ylim=[-1100,1500],
                               xlim=[TINIT,TCUT],timedelta=False)
         ax.set_xticks(sat_ax.get_xticks())
@@ -498,6 +551,7 @@ def plot_figure_2(path:str,sats:pd.DataFrame,
                    ncol=2, fancybox=True, shadow=True)
     cpcp_ax.text(0.98,0.02,f"(i)",transform=cpcp_ax.transAxes,
                   c='black',horizontalalignment='right',fontsize=36)
+    cpcp_ax.set_xlabel('Time [dy-hr]')
     for ax in [sat_ax,mag_ax1,mag_ax2,mag_ax3,fac_ax,cpcp_ax]:
         ax.margins(x=0.01)
         ax.grid()
@@ -519,13 +573,14 @@ def draw_scatter_panel(ax:plt.Axes,
     trecovery = X.index>TMIN
     team_colors = ['red','blue']
     markers = ['o','o']
+    nbins = [11,31]
     for i,phase in enumerate([tpre,tstorm]):
         # Get Pearson r
         slope,intercept,r,p,std_err = scipy.stats.linregress(X[phase].values,
                                                              Y[phase].values)
         # Obtain low,50, and high %tiles, and variance binned by our X axis
         X_bins   = np.linspace(X[phase].quantile(0.005),
-                               X[phase].quantile(0.995),33)
+                               X[phase].quantile(0.995),nbins[i])
         bin_Ranges = bin_and_describe(X[phase],Y[phase],Y[phase],X_bins,
                                       0.05,0.95)
         # Plot
@@ -919,6 +974,7 @@ def draw_general_scatter(ax:plt.Axes,Y:pd.Series,X:pd.Series,
     team_colors = [kwargs.get('red_shade','red'),
                    kwargs.get('blue_shade','blue')]
     markers = ['o','o']
+    nbins = [11,31]
     text_X,text_Y = kwargs.get('text_xy',[0.02,0.94])
     text_head = kwargs.get('text_head',r'$R^2$=')
     for i,phase in enumerate([tpre,tstorm]):
@@ -927,7 +983,7 @@ def draw_general_scatter(ax:plt.Axes,Y:pd.Series,X:pd.Series,
                                                              Y[phase].values)
         # Obtain low,50, and high %tiles, and variance binned by our X axis
         X_bins   = np.linspace(X[phase].quantile(0.005),
-                               X[phase].quantile(0.995),33)
+                               X[phase].quantile(0.995),nbins[i])
         bin_Ranges = bin_and_describe(X[phase],Y[phase],Y[phase],X_bins,
                                       0.05,0.95)
         # Plot
@@ -1002,10 +1058,10 @@ def draw_swmf_sparse(ax:plt.Axes,CPCP:pd.Series,dmsp:dict,X:pd.Series) -> None:
                                              X_sparse_storm[:,2])]).T
 
         ax.scatter(X_sparse_pre[:,0],dmsp[sat]['ie_cpcp'][clean][pre],ec='red',
-                   alpha=0.8,label=satlabel+' Pre',s=200,c='black')
+                   alpha=0.8,label=satlabel+' Pre',s=200,c='red')
         ax.scatter(X_sparse_storm[:,0],dmsp[sat]['ie_cpcp'][clean][storm],
                    ec='blue',
-                   label=satlabel+' Storm',s=200,c='black',alpha=0.8)
+                   label=satlabel+' Storm',s=200,c='blue',alpha=0.8)
 
         ax.errorbar(X_sparse_pre[:,0],dmsp[sat]['ie_cpcp'][clean][pre],
                     xerr=err_pre,fmt='none',ecolor='black')
@@ -1097,6 +1153,13 @@ def plot_figure_5(path:str,solarwind:pd.DataFrame,
                        data=np.interp(t_mp,t_sw,solarwind['CPCP_K08'].values))
     SWIPE = pd.Series(index=K1.index,name='SWIPE',
                       data=np.interp(t_mp,t_swipe,swipe['cpcp_n']))
+    v = np.interp(t_mp,t_sw,solarwind['v'])
+    B = np.interp(t_mp,t_sw,solarwind['B'])
+    Ma = np.interp(t_mp,t_sw,solarwind['Ma'])
+    clock = np.interp(t_mp,t_sw,np.arccos(solarwind['bz']/solarwind['B']))
+    Rms = mp['X_subsolar [Re]']
+    R05 = (1e-4*v**2 + 11.7*B*(1-np.exp(-Ma/3))*abs(np.sin(clock/2)**3))*Rms/9
+
     tpre   = FAC.index<TMAIN
     tstorm = FAC.index>TMAIN
     dmsp_sparse = {}
@@ -1156,10 +1219,18 @@ def plot_figure_5(path:str,solarwind:pd.DataFrame,
     draw_swmf_sparse(ax_swmf_ampere,CPCP,dmsp_sparse,AMP_FAC)
     draw_dmsp_sparse(ax_dmsp_Esw,dmsp_sparse,Esw)
     draw_dmsp_sparse(ax_dmsp_ampere,dmsp_sparse,AMP_FAC)
+    '''
     draw_general_scatter(ax_empirical_Esw,BOYLE,Esw,'black','Boyle',
                          text_head='',text_xy=[0.02,.89],
                          red_shade='darkred',blue_shade='darkblue')
     draw_general_scatter(ax_empirical_ampere,BOYLE,AMP_FAC,'black','Boyle',
+                         text_head='',text_xy=[0.02,.89],
+                         red_shade='darkred',blue_shade='darkblue')
+    '''
+    draw_general_scatter(ax_empirical_Esw,R05,Esw,'black','Ridley2005',
+                         text_head='',text_xy=[0.02,.89],
+                         red_shade='darkred',blue_shade='darkblue')
+    draw_general_scatter(ax_empirical_ampere,R05,AMP_FAC,'black','Ridley2005',
                          text_head='',text_xy=[0.02,.89],
                          red_shade='darkred',blue_shade='darkblue')
     draw_general_scatter(ax_empirical_Esw,SWIPE,Esw,'white','SWIPE',
@@ -1325,9 +1396,9 @@ def main() -> None:
     swipe = dict(np.load("../data/swipe/swipe_cpcp.npz"))
 
     ## Create Figures
-    #plot_figure_1(unfiled,solarwind,swmf_log,mp,ie,omni)
-    plot_figure_2(unfiled,sats,vsats,vmagnets,
-                  I_ampere,I_swmf,pc,swmf_log,dmsp,ie,swipe)
+    plot_figure_1(unfiled,solarwind,swmf_log,mp,ie,omni)
+    #plot_figure_2(unfiled,mp,solarwind,sats,vsats,vmagnets,
+    #              I_ampere,I_swmf,pc,swmf_log,dmsp,ie,swipe)
     #plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     #plot_figure_4(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     #plot_figure_5(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log,dmsp,ie,swipe)
