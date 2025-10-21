@@ -11,11 +11,13 @@
   - **sat**: satellite data files (real and virtual)
 - **inputs**: files used to run the SWMF simulation
 - **outputs**: figures or visualizations produced for the paper
+  - **figures**: numeric plots
+    - **final**: location of figures used in the paper
+    - **unfiled**: location for working/test figures
+  - **vis**: non-numeric plots
 - **scripts**: python code used to produce the outputs
 
 # Notes for file formats
-- **.png**: image files
-- **.pdf**: pdf exported image files
 - **.csv**: human readable ASCII
 - **.log**: human readable ASCII
 - **.dat**: human readable ASCII
