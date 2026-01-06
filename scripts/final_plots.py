@@ -230,9 +230,11 @@ def draw_magnetometer_panel(ax:plt.Axes,vmagnets:pd.DataFrame,
     supermag = proc_supermag(station,vmagnets.index[0],vmagnets.index[-1])
     swmf_single = vmagnets[vmagnets['IAGA']==station]
     # Draw both lines on this axis with some settings
+    ax.fill_between(swmf_single.index,swmf_single['dBn'].values,
+                    fc='deepskyblue')
     ax.plot(supermag.index,supermag['dBn'],label='dBn_sm',c='black',lw=3)
-    plot_colorline(swmf_single.index,swmf_single['dBn'].values,
-                   swmf_single['mlt'].values,ax)
+    #plot_colorline(swmf_single.index,swmf_single['dBn'].values,
+    #               swmf_single['mlt'].values,ax)
     ax.plot(swmf_single.index,swmf_single['dBn'].values,c='grey',label='_no')
     ax.axvline(swmf_single.index[abs(swmf_single['mlt']-9)<0.1][0],
                c='goldenrod',lw=3)
@@ -1396,9 +1398,9 @@ def main() -> None:
     swipe = dict(np.load("../data/swipe/swipe_cpcp.npz"))
 
     ## Create Figures
-    plot_figure_1(unfiled,solarwind,swmf_log,mp,ie,omni)
-    #plot_figure_2(unfiled,mp,solarwind,sats,vsats,vmagnets,
-    #              I_ampere,I_swmf,pc,swmf_log,dmsp,ie,swipe)
+    #plot_figure_1(unfiled,solarwind,swmf_log,mp,ie,omni)
+    plot_figure_2(unfiled,mp,solarwind,sats,vsats,vmagnets,
+                  I_ampere,I_swmf,pc,swmf_log,dmsp,ie,swipe)
     #plot_figure_3(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     #plot_figure_4(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log)
     #plot_figure_5(unfiled,solarwind,mp,I_swmf,I_ampere,swmf_log,dmsp,ie,swipe)
