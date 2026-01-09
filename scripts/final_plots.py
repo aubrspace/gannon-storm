@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Final analysis and plots for the Gannon storm GRL paper
+"""Final analysis and plots for the Gannon storm Space Weather paper
 """
 import os,sys,glob,time
 import numpy as np
@@ -231,11 +231,11 @@ def draw_magnetometer_panel(ax:plt.Axes,vmagnets:pd.DataFrame,
     swmf_single = vmagnets[vmagnets['IAGA']==station]
     # Draw both lines on this axis with some settings
     ax.fill_between(swmf_single.index,swmf_single['dBn'].values,
-                    fc='deepskyblue')
-    ax.plot(supermag.index,supermag['dBn'],label='dBn_sm',c='black',lw=3)
+                    fc='deepskyblue',label='SWMF')
+    ax.plot(supermag.index,supermag['dBn'],label='Obs.',c='black',lw=3)
     #plot_colorline(swmf_single.index,swmf_single['dBn'].values,
     #               swmf_single['mlt'].values,ax)
-    ax.plot(swmf_single.index,swmf_single['dBn'].values,c='grey',label='_no')
+    ax.plot(swmf_single.index,swmf_single['dBn'].values,c='grey',label='_SWMF')
     ax.axvline(swmf_single.index[abs(swmf_single['mlt']-9)<0.1][0],
                c='goldenrod',lw=3)
     ax.axvline(swmf_single.index[abs(swmf_single['mlt']-15)<0.1][0],
@@ -461,11 +461,11 @@ def plot_figure_2(path:str,mp:pd.DataFrame,
     station_titles = [r'FMC $\left(64.3^{\circ}\right)$',
                       r'MEA $\left(61.9^{\circ}\right)$',
                       r'T43 $\left(57.9^{\circ}\right)$']
-    ampere_path = '../data/ampere/'
+    ampere_path = '../data/ampere/'#'
     #ampere_quicklook='1715372880.north.png'
     ampere_quicklook='1715372880.north_annotated.png'
     ampere_image = plt.imread(f"{ampere_path}{ampere_quicklook}")
-    paraview_path = '../outputs/vis/'
+    paraview_path = '../outputs/vis/'#'
     #paraview_compare = 'FAC_ampere_compare.png'
     paraview_compare = 'FAC_ampere_compare_annotated.png'
     paraview_image = plt.imread(f"{paraview_path}{paraview_compare}")
@@ -522,9 +522,14 @@ def plot_figure_2(path:str,mp:pd.DataFrame,
     letters = ['(c)','(d)','(e)']
     for i,ax in enumerate([mag_ax1,mag_ax2,mag_ax3]):
         general_plot_settings(ax,do_xlabel=False,legend=False,
-                              ylabel=f'{station_titles[i]}',
+                              legend_loc='upper left',
+                              ylabel=f'{station_titles[i]}\n'+
+                                     r'$\Delta B_{N} \left[ nT\right]$',
                               ylim=[-1100,1500],
                               xlim=[TINIT,TCUT],timedelta=False)
+        if i==0:
+            ax.legend(bbox_to_anchor=(0.195,0.875))
+        ax.yaxis.set_label_coords(-0.05,0.5)
         ax.set_xticks(sat_ax.get_xticks())
         ax.set_xlim([TINIT,TCUT])
         if i<2:
@@ -975,6 +980,10 @@ def draw_general_scatter(ax:plt.Axes,Y:pd.Series,X:pd.Series,
     phase_name = ['Pre','Storm']
     team_colors = [kwargs.get('red_shade','red'),
                    kwargs.get('blue_shade','blue')]
+    if color=='black':
+        color = ['red','blue']
+    else:
+        color = [color,color]
     markers = ['o','o']
     nbins = [11,31]
     text_X,text_Y = kwargs.get('text_xy',[0.02,0.94])
@@ -998,7 +1007,7 @@ def draw_general_scatter(ax:plt.Axes,Y:pd.Series,X:pd.Series,
                     transform=ax.transAxes,
                     c=team_colors[i],horizontalalignment='right')
         sc = ax.scatter(X[phase],Y[phase],marker=markers[i],
-                        c=color,ec=team_colors[i],s=50,alpha=0.8,
+                        c=color[i],ec=team_colors[i],s=50,alpha=0.8,
                         label=f"{phase_name[i]} {label}")
         ax.plot(X_bins,bin_Ranges['p50_all'],c=team_colors[i],lw=4)
         ax.plot(X_bins,slope*X_bins+intercept,c=team_colors[i],ls='--',lw=3)
@@ -1304,7 +1313,7 @@ def main() -> None:
     TCUT = dt.datetime(2024,5,11,10,0)
     TMIN  = dt.datetime(2024,5,11,1,30)
     TEND  = dt.datetime(2024,5,11,17,0)
-    inBase = os.path.realpath('..')+'/'
+    inBase = os.path.realpath('..')+'/'     #'
     inLogs = os.path.join(inBase,'data/logs/')
     inSats = os.path.join(inBase,'data/sat/')
     inAnalysis = os.path.join(inBase,'data/analysis/')
@@ -1327,7 +1336,7 @@ def main() -> None:
     pc = dataset['obs']['pc']
     #magfile = "../data/large/GM/IO2/magnetometers_e20240510-130000.mag"
     #vmagnets = loadmagnetometers(magfile)
-    magfile = "../data/logs/magnetometers_e20240510-130000.npz"
+    magfile = "../data/logs/magnetometers_e20240510-130000.npz" #"
     mag = np.load(magfile,allow_pickle=True)
     vmagnets = pd.DataFrame(dict(mag))
     vmagnets.index = vmagnets['time']
@@ -1345,15 +1354,15 @@ def main() -> None:
     plasmasheet = dataset['analysis']['msdict']['plasmasheet']
     inner = dataset['analysis']['inner_mp']
     ie = {}
-    ie['N'] = dict(np.load("../data/large/IE/ionosphere/compiled_N.npz",
+    ie['N'] = dict(np.load("../data/large/IE/ionosphere/compiled_N.npz", #"
                            allow_pickle=True))
-    ie['S'] = dict(np.load("../data/large/IE/ionosphere/compiled_S.npz",
+    ie['S'] = dict(np.load("../data/large/IE/ionosphere/compiled_S.npz", #"
                            allow_pickle=True))
 
     ## Satellite data
     sats = {}
     # GOES16
-    goes_hardcopy = '../data/sat/goes_hardcopy.csv'
+    goes_hardcopy = '../data/sat/goes_hardcopy.csv'#'
     if os.path.exists(goes_hardcopy):
         print(f'{goes_hardcopy} found ...')
         goes_df = pd.read_csv(goes_hardcopy,index_col='time')
@@ -1379,7 +1388,7 @@ def main() -> None:
     vsats = dataset['vsats']
 
     ## AMPERE data
-    ampere_path = '../data/ampere'
+    ampere_path = '../data/ampere'#'
     all_data = pd.DataFrame()
     for infile in glob.glob(f"{ampere_path}/*.dat"):
         df = read_currents(infile)
@@ -1395,7 +1404,7 @@ def main() -> None:
                            allow_pickle=True))
 
     ## SWIPE
-    swipe = dict(np.load("../data/swipe/swipe_cpcp.npz"))
+    swipe = dict(np.load("../data/swipe/swipe_cpcp.npz")) #"
 
     ## Create Figures
     #plot_figure_1(unfiled,solarwind,swmf_log,mp,ie,omni)
